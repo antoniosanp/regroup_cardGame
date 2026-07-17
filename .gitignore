@@ -1,1 +1,35 @@
 /cardGame
+
+# Maven
+target/
+*.jar
+*.war
+*.class
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.tsbuildinfo
+.env
+.env.local
+*.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Java
+hs_err_pid*
