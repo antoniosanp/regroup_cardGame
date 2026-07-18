@@ -2,6 +2,8 @@ package com.regroup.engine;
 
 public class Player {
 
+    private final Board board = new Board();
+
     private int hp = 30;
     private int pa = 0;
     private int pd = 0;
@@ -9,6 +11,10 @@ public class Player {
     private int md = 0;
     private int cn = 0;
     private int hpp = 0;
+
+    public Board board() {
+        return board;
+    }
 
     public int hp() {
         return hp;
