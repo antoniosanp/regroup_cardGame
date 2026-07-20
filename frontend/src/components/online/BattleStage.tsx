@@ -16,13 +16,19 @@ import type { Attack, PlayerState } from '../../online/messages';
 import type { BattleVM } from '../../online/onlineStore';
 import { playSfx } from '../../sfx/playSfx';
 import { AnimatedNumber } from './AnimatedNumber';
-import { BattlePanel } from './BattlePanel';
 
 interface BattleStageProps {
   battle: BattleVM;
   players: PlayerState[];
   selfId: string;
-  nameOf: (playerId: string) => string;
+  /**
+   * Fires once the animation sequence reaches its finished state (naturally or via Skip). The
+   * server's own battle-phase pause is only a best-effort estimate of how long this runs, so the
+   * caller should keep this overlay mounted until this fires rather than tearing it down the
+   * instant phase flips away from BATTLE — otherwise a slow client / fast server can cut off the
+   * last attacks of the last attacker's phase mid-animation.
+   */
+  onFinished?: () => void;
 }
 
 interface Floater {
@@ -62,7 +68,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export function BattleStage({ battle, players, selfId, nameOf }: BattleStageProps) {
+export function BattleStage({ battle, players, selfId, onFinished }: BattleStageProps) {
   const ordered = [...players].sort((a, b) => a.seat - b.seat);
 
   const arenaRef = useRef<HTMLDivElement | null>(null);
@@ -205,17 +211,19 @@ export function BattleStage({ battle, players, selfId, nameOf }: BattleStageProp
       setActiveAttackerId(null);
 
       if (!skippedRef.current) {
-        for (const o of battle.outcomes) {
-          if (o.healedHp > 0 && !o.eliminated) {
-            addFloater(o.playerId, `+${o.healedHp}`, 'heal');
-            playSfx('heal');
-          }
+        const healedNow = battle.outcomes.filter((o) => o.healedHp > 0 && !o.eliminated);
+        for (const o of healedNow) {
+          addFloater(o.playerId, `+${o.healedHp}`, 'heal');
+          playSfx('heal');
         }
         setShownHp(Object.fromEntries(battle.outcomes.map((o) => [o.playerId, o.hpAfter])));
+        // Give the heal floater (potion use) its own beat to be read, same as the
+        // elimination beat below — otherwise "finished" can land before it's visible.
+        if (healedNow.length > 0 && active()) await sleep(900);
         const eliminatedNow = battle.outcomes.filter((o) => o.eliminated);
         setDeadIds(new Set(eliminatedNow.map((o) => o.playerId)));
         eliminatedNow.forEach(() => playSfx('eliminated'));
-        if (eliminatedNow.length > 0) await sleep(700);
+        if (eliminatedNow.length > 0 && active()) await sleep(700);
         if (!cancelled) {
           setFinished(true);
           playSfx('battle-end');
@@ -231,6 +239,13 @@ export function BattleStage({ battle, players, selfId, nameOf }: BattleStageProp
     // The sequence replays only for a genuinely new battle result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battle]);
+
+  useEffect(() => {
+    if (finished) onFinished?.();
+    // Fires once per battle, exactly when `finished` transitions to true — not
+    // on every re-render onFinished's identity happens to change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished]);
 
   const attacker = ordered.find((p) => p.playerId === activeAttackerId) ?? null;
 
@@ -343,7 +358,6 @@ export function BattleStage({ battle, players, selfId, nameOf }: BattleStageProp
 
       {finished && (
         <div className="battle-stage-log">
-          <BattlePanel battle={battle} nameOf={nameOf} />
           <p className="hint">Next round starts automatically…</p>
         </div>
       )}

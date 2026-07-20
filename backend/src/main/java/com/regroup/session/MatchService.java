@@ -50,15 +50,22 @@ public class MatchService {
     private static final String PRIVATE_QUEUE = "/queue/game";
     private static final long FINISHED_MATCH_RETENTION_MINUTES = 10;
     private static final long TURN_TIMEOUT_SECONDS = 60;
-    // Bots act after a short, human-like delay rather than waiting on the turn timeout.
-    private static final long BOT_MOVE_MIN_MS = 500;
-    private static final long BOT_MOVE_MAX_MS = 1500;
+    // Bots act after a short, human-like delay rather than waiting on the turn timeout. Kept
+    // slow enough that a chain of bot turns after a battle reads as separate beats rather than
+    // as one instant block landing right on top of the battle-end sound (which is what made
+    // "your turn" feel like it fires immediately after every battle in bot matches).
+    private static final long BOT_MOVE_MIN_MS = 1200;
+    private static final long BOT_MOVE_MAX_MS = 2600;
     // Pause between BATTLE_RESULT and the next ROUND_START / MATCH_RESULT so clients can play
-    // the per-attack battle animation (one mini animation per attacker->defender pair, ~0.75s
-    // each on the clients) plus a beat to read the outcome. The engine has already resolved
-    // everything by then; only the announcements wait.
-    private static final long BATTLE_PAUSE_BASE_MS = 2000;
-    private static final long BATTLE_PAUSE_PER_ATTACK_MS = 800;
+    // the per-attack battle animation before the phase (and BattleStage's overlay) flips away.
+    // Must cover BattleStage.tsx's actual timeline or the trailing attacks of the last phase get
+    // cut off mid-animation: per phase (one per distinct attacker, up to PLAYER_COUNT of them) a
+    // 450ms "who's attacking" beat, then per attack a 600ms lunge + 420ms impact flash + 280ms
+    // pause (1300ms), plus a 900ms beat if anyone healed (potion use must stay visible) and a
+    // 700ms beat if anyone was eliminated — both can apply in the same battle. BASE covers the
+    // phase beats + heal + elimination beats + margin; PER_ATTACK matches the per-attack cost.
+    private static final long BATTLE_PAUSE_BASE_MS = 3800;
+    private static final long BATTLE_PAUSE_PER_ATTACK_MS = 1300;
 
     private final SimpMessagingTemplate messaging;
     private final Random rng = new SecureRandom();

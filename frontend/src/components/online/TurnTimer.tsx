@@ -18,14 +18,27 @@ interface TurnTimerProps {
   currentSeat: number;
   currentName?: string;
   isYourTurn: boolean;
+  /**
+   * Freezes the countdown at --:--. The countdown approximates a server-enforced 60s cap that
+   * does not exist in the self-paced tutorial, where a player can sit on a step for minutes —
+   * left running it would visibly hit 0:00 and fire timer-expired mid-lesson.
+   */
+  paused?: boolean;
 }
 
-export function TurnTimer({ phase, round, currentSeat, currentName, isYourTurn }: TurnTimerProps) {
+export function TurnTimer({
+  phase,
+  round,
+  currentSeat,
+  currentName,
+  isYourTurn,
+  paused = false,
+}: TurnTimerProps) {
   const [secondsLeft, setSecondsLeft] = useState(TURN_SECONDS);
 
   useEffect(() => {
     setSecondsLeft(TURN_SECONDS);
-    if (phase !== 'TURN') return;
+    if (paused || phase !== 'TURN') return;
     const id = setInterval(() => {
       setSecondsLeft((s) => {
         const next = s > 0 ? s - 1 : 0;
@@ -42,7 +55,7 @@ export function TurnTimer({ phase, round, currentSeat, currentName, isYourTurn }
     return () => clearInterval(id);
     // Resets only for a genuinely new turn, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round, currentSeat, phase]);
+  }, [round, currentSeat, phase, paused]);
 
   const wasYourTurn = useRef(isYourTurn);
   useEffect(() => {
@@ -50,21 +63,22 @@ export function TurnTimer({ phase, round, currentSeat, currentName, isYourTurn }
     wasYourTurn.current = isYourTurn;
   }, [isYourTurn]);
 
-  const inTurn = phase === 'TURN';
+  const inTurn = phase === 'TURN' && !paused;
   const low = inTurn && secondsLeft <= 10;
+  const yours = inTurn && isYourTurn;
   const mm = Math.floor(secondsLeft / 60);
   const ss = secondsLeft % 60;
 
   return (
     <div
-      className={`turn-timer${low ? ' turn-timer-low' : ''}`}
+      className={`turn-timer${low ? ' turn-timer-low' : ''}${yours ? ' turn-timer-yours' : ''}`}
       style={{ backgroundImage: `url(${BOARD_ART.panelSquare})` }}
     >
       <div className="turn-timer-value">{inTurn ? `${mm}:${ss.toString().padStart(2, '0')}` : '--:--'}</div>
       <div className="turn-timer-label">
         {phase === 'TURN'
           ? isYourTurn
-            ? 'Your turn'
+            ? 'Your turn!'
             : (currentName ?? 'Waiting…')
           : phase === 'BATTLE'
             ? 'Battle'

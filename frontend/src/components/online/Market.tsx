@@ -24,6 +24,10 @@ export function Market({ market, deckRemaining, canPick, yourCoins, finalRound, 
           const price = finalRound ? 0 : PRICE[slot];
           const affordable = yourCoins >= price;
           const enabled = canPick && !!card && affordable;
+          // It's your turn, there's a card, you just can't afford it — worth calling
+          // out clearly rather than fading it into the same "inert" look as a slot
+          // that's irrelevant because it isn't your turn at all.
+          const blockedByCoins = canPick && !!card && !affordable;
           // Price lives in the button text (not a separate label row) so the
           // card + button stack always fits inside the frame's painted window.
           const priceText = price === 0 ? 'Free' : `${price} coin${price > 1 ? 's' : ''}`;
@@ -31,6 +35,7 @@ export function Market({ market, deckRemaining, canPick, yourCoins, finalRound, 
             <div key={slot} className="market-slot">
               {card ? <CardView card={card} /> : <EmptyCard label="empty" />}
               <button
+                className={blockedByCoins ? 'market-slot-btn-blocked' : undefined}
                 aria-disabled={!enabled}
                 onClick={() => {
                   if (enabled) onPick(slot);

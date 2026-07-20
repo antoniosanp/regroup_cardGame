@@ -4,6 +4,7 @@
 // it). Regroup has no hidden information, so every board / the market / all
 // stats are mirrored in full for every player.
 
+import { createContext, useContext } from 'react';
 import { createStore, useStore } from 'zustand';
 import {
   clearIdentity,
@@ -61,6 +62,10 @@ export interface OnlineState {
   phase: Phase;
   round: number;
   currentSeat: number;
+  // Seat that opened this round (first to move). Only ROUND_START carries it on
+  // the wire; RESUME_STATE (reconnect) doesn't, so it's derived there via the same
+  // (round - 1) % PLAYER_COUNT rotation MatchEngine uses server-side.
+  startingSeat: number;
   finalRound: boolean;
 
   boards: Record<string, BoardPoint[]>;
@@ -79,6 +84,12 @@ export interface OnlineState {
   reason: string | null;
 
   start: (name: string) => Promise<void>;
+  /**
+   * Connects with an identity we already hold, skipping HTTP registration. Only the tutorial
+   * uses this: its identity is fabricated rather than registered, but it still needs to go
+   * through the real connect() handshake so the store runs its genuine code paths.
+   */
+  startWithIdentity: (identity: Identity) => void;
   joinQueue: () => void;
   leaveQueue: () => void;
   playOffline: () => void;
@@ -97,6 +108,7 @@ const MATCH_RESET = {
   phase: 'TURN' as Phase,
   round: 0,
   currentSeat: -1,
+  startingSeat: -1,
   finalRound: false,
   boards: {} as Record<string, BoardPoint[]>,
   market: { A: null, B: null, C: null } as Market,
@@ -158,6 +170,8 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
             phase: msg.phase,
             round: msg.round,
             currentSeat: msg.currentSeat,
+            // Matches MatchEngine's fixed 4-seat rotation (startingSeat = (round - 1) % PLAYER_COUNT).
+            startingSeat: (msg.round - 1) % 4,
             finalRound: msg.finalRound,
             players: msg.players,
             connected: Object.fromEntries(msg.players.map((p) => [p.playerId, true])),
@@ -196,6 +210,7 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
             round: msg.round,
             phase: 'TURN',
             currentSeat: msg.startingSeat,
+            startingSeat: msg.startingSeat,
             finalRound: msg.finalRound,
             heldCard: null,
             heldBy: null,
@@ -374,6 +389,11 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
         }
       },
 
+      startWithIdentity: (identity: Identity) => {
+        set({ error: null, identity });
+        connect(identity);
+      },
+
       joinQueue: () => {
         set({ stage: 'queue', error: null });
         socket?.publish('/app/queue.join', {});
@@ -432,6 +452,14 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
 
 export const onlineStore = createOnlineStore(() => new StompGameSocket());
 
+export type OnlineStoreApi = ReturnType<typeof createOnlineStore>;
+
+// Defaults to the app-wide singleton, so every existing caller is unaffected and
+// no provider is needed around the normal app. The tutorial overrides it with its
+// own store driven by a scripted in-memory socket — that is what lets the tutorial
+// render the real Match UI verbatim instead of a fork that would silently drift.
+export const OnlineStoreContext = createContext<OnlineStoreApi>(onlineStore);
+
 export function useOnlineStore<T>(selector: (s: OnlineState) => T): T {
-  return useStore(onlineStore, selector);
+  return useStore(useContext(OnlineStoreContext), selector);
 }

@@ -1,8 +1,8 @@
-import { useState, type DragEvent } from 'react';
+import { useEffect, useState, type DragEvent } from 'react';
 import { BOARD_ART } from '../../online/assets';
 import { cardToPoints, type CornerName } from '../../online/cards';
 import type { Stats } from '../../online/messages';
-import { useOnlineStore } from '../../online/onlineStore';
+import { useOnlineStore, type BattleVM } from '../../online/onlineStore';
 import { playSfx } from '../../sfx/playSfx';
 import { BattleStage } from './BattleStage';
 import { BoardView } from './BoardView';
@@ -10,6 +10,7 @@ import { CardView } from './CardView';
 import { Market } from './Market';
 import { OpponentsModal } from './OpponentsModal';
 import { PlayerHud } from './PlayerHud';
+import { PlayerOrderRow } from './PlayerOrderRow';
 import { ResultScreen } from './ResultScreen';
 import { TurnTimer } from './TurnTimer';
 
@@ -23,13 +24,21 @@ function quadrantOf(e: DragEvent<HTMLDivElement>): CornerName {
   return isLeft ? 'BOTTOM_LEFT' : 'BOTTOM_RIGHT';
 }
 
-export function Match({ onExit }: { onExit: () => void }) {
+export function Match({
+  onExit,
+  pauseTimer = false,
+}: {
+  onExit: () => void;
+  /** Freezes the turn countdown. Set by the self-paced tutorial; see TurnTimer's `paused`. */
+  pauseTimer?: boolean;
+}) {
   const self = useOnlineStore((s) => s.identity?.playerId ?? '');
   const players = useOnlineStore((s) => s.players);
   const connected = useOnlineStore((s) => s.connected);
   const phase = useOnlineStore((s) => s.phase);
   const round = useOnlineStore((s) => s.round);
   const currentSeat = useOnlineStore((s) => s.currentSeat);
+  const startingSeat = useOnlineStore((s) => s.startingSeat);
   const finalRound = useOnlineStore((s) => s.finalRound);
   const yourSeat = useOnlineStore((s) => s.yourSeat);
   const boards = useOnlineStore((s) => s.boards);
@@ -51,6 +60,27 @@ export function Match({ onExit }: { onExit: () => void }) {
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
   const [opponentsOpen, setOpponentsOpen] = useState(false);
 
+  // The server's battle-phase pause is only a best-effort estimate of the client
+  // animation's real length. Capturing the battle here (instead of rendering
+  // straight off the store's lastBattle) lets the overlay outlive a ROUND_START
+  // that arrives before BattleStage says it's actually finished, so a fast
+  // server / slow client never cuts off the last attacker's last hits.
+  const [overlayBattle, setOverlayBattle] = useState<BattleVM | null>(null);
+  const [overlayDone, setOverlayDone] = useState(false);
+
+  useEffect(() => {
+    if (lastBattle) {
+      setOverlayBattle(lastBattle);
+      setOverlayDone(false);
+    }
+  }, [lastBattle]);
+
+  useEffect(() => {
+    if (overlayDone && phase !== 'BATTLE' && overlayBattle) {
+      setOverlayBattle(null);
+    }
+  }, [overlayDone, phase, overlayBattle]);
+
   if (phase === 'MATCH_OVER') {
     const youWon = winners?.includes(self) ?? false;
     return (
@@ -58,7 +88,6 @@ export function Match({ onExit }: { onExit: () => void }) {
     );
   }
 
-  const nameOf = (playerId: string) => players.find((p) => p.playerId === playerId)?.name ?? playerId;
   const isMyTurn = phase === 'TURN' && currentSeat === yourSeat;
   const iHoldCard = heldBy === self && heldCard !== null;
   const canPick = isMyTurn && heldBy === null && !busy;
@@ -116,6 +145,7 @@ export function Match({ onExit }: { onExit: () => void }) {
           currentSeat={currentSeat}
           currentName={currentName}
           isYourTurn={isMyTurn}
+          paused={pauseTimer}
         />
 
         <section className="market-section">
@@ -129,16 +159,25 @@ export function Match({ onExit }: { onExit: () => void }) {
           />
         </section>
 
-        <button
-          type="button"
-          className="opponent-board-btn"
-          style={{ backgroundImage: `url(${BOARD_ART.opponentBoardButton})` }}
-          aria-label="Opponent boards"
-          onClick={() => {
-            playSfx('ui-modal-open');
-            setOpponentsOpen(true);
-          }}
-        />
+        <div className="opponent-board-col">
+          <button
+            type="button"
+            className="opponent-board-btn"
+            style={{ backgroundImage: `url(${BOARD_ART.opponentBoardButton})` }}
+            aria-label="Opponent boards"
+            onClick={() => {
+              playSfx('ui-modal-open');
+              setOpponentsOpen(true);
+            }}
+          />
+          <PlayerOrderRow
+            players={players}
+            currentSeat={currentSeat}
+            startingSeat={startingSeat}
+            phase={phase}
+            selfId={self}
+          />
+        </div>
       </div>
 
       <section className="board-zone">
@@ -231,8 +270,13 @@ export function Match({ onExit }: { onExit: () => void }) {
         heldBy={heldBy}
       />
 
-      {phase === 'BATTLE' && lastBattle && (
-        <BattleStage battle={lastBattle} players={players} selfId={self} nameOf={nameOf} />
+      {overlayBattle && (phase === 'BATTLE' || !overlayDone) && (
+        <BattleStage
+          battle={overlayBattle}
+          players={players}
+          selfId={self}
+          onFinished={() => setOverlayDone(true)}
+        />
       )}
     </div>
   );

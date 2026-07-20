@@ -32,6 +32,27 @@ Every card is a square with four corners. Each corner can have one of the follow
 | o | 1 md |
 | p | 2 md |
 
+### Corner composition
+
+A stat category (pa, pd, ma, md) may appear on **at most two** corners of the same card, and when it appears twice those two corners **must be diagonally opposite** — never side by side.
+
+The reason is the adjacency rule below: two corners that sit side by side on a card are orthogonal neighbours once the card is placed, so a side-by-side pair would match *itself* and score the moment the card lands, with no placement skill involved. A diagonal pair only touches at a point, so it never self-matches — the player still has to line it up against neighbouring cards to make it count.
+
+Empty/coin/potion corners have no stat category and are exempt.
+
+### Deck composition
+
+The deck is built from 8-card units, 14 units for a standard 112-card deck:
+
+| Shape | Per unit | Total | Corners |
+|-------|----------|-------|---------|
+| Normal | 3 | 42 | one +1 corner of each of pa/pd/ma/md |
+| Double | 2 | 28 | one category at +2, the other three at +1 |
+| Pair | 2 | 28 | one category at +2 **and** +1 on a diagonal, plus two other categories at +1 |
+| Empty | 1 | 14 | one empty/coin/potion corner plus three categories at +1 |
+
+Pair is the only shape that repeats a category. Which category is doubled (and which is paired) rotates evenly across pa/pd/ma/md, so no stat is over-represented in the deck.
+
 ## Turns
 
 On the first turn, one player is selected to move first (it doesn't matter who). After each round, the first player rotates in a loop, so that every player eventually starts a round:

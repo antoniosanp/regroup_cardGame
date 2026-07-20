@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
 import { loadIdentity } from '../../online/api';
+import { MENU_ART } from '../../online/assets';
 import { useOnlineStore } from '../../online/onlineStore';
 import { playMusic, playSfx, stopMusic } from '../../sfx/playSfx';
 import { useSfxStore } from '../../sfx/sfxStore';
+import { HowToPlayMenu } from '../../tutorial/HowToPlayMenu';
+import { RulesPage } from '../../tutorial/RulesPage';
+import { TutorialScreen } from '../../tutorial/TutorialScreen';
 import { Match } from './Match';
+import { MenuButton, MenuPanel } from './MenuShell';
+
+/** Which How-to-Play view is open over the lobby, if any. */
+type HowTo = 'none' | 'menu' | 'rules' | 'tutorial';
 
 export function OnlineScreen() {
   const stage = useOnlineStore((s) => s.stage);
@@ -14,18 +22,26 @@ export function OnlineScreen() {
   const muted = useSfxStore((s) => s.muted);
   const toggleMute = useSfxStore((s) => s.toggleMute);
 
+  // Local rather than a new Stage: every Stage value is tied to the connection/match
+  // lifecycle and would be reset by an incoming server message.
+  const [howTo, setHowTo] = useState<HowTo>('none');
+
+  // The tutorial renders the full match UI, so it wants the same chrome a real match
+  // gets: no lobby music, no page title, and the match layout class.
+  const matchLike = stage === 'match' || howTo === 'tutorial';
+
   // Lobby music plays on every pre-match stage and stops the instant a match
   // starts; it should not resume mid-match even if stage briefly toggles.
   useEffect(() => {
-    if (stage === 'match') {
+    if (matchLike) {
       stopMusic();
     } else {
       playMusic('music-lobby');
     }
-  }, [stage]);
+  }, [matchLike]);
 
   return (
-    <div className={`screen${stage === 'match' ? ' screen-match' : ''}`}>
+    <div className={`screen${matchLike ? ' screen-match' : ''}`}>
       <button
         type="button"
         className="btn-ghost mute-toggle"
@@ -35,7 +51,8 @@ export function OnlineScreen() {
         {muted ? '🔇' : '🔊'}
       </button>
 
-      {stage !== 'match' && <h1 className="title">Regroup</h1>}
+      {/* No <h1> title: the menu panel's background art has the logo painted into it,
+          and every non-match screen now renders inside that panel. */}
 
       {conn === 'reconnecting' && (
         <div className="banner banner-warn" role="status">
@@ -57,7 +74,18 @@ export function OnlineScreen() {
       )}
 
       {stage === 'name' && <NameEntry />}
-      {stage === 'lobby' && <Lobby />}
+      {stage === 'lobby' && howTo === 'none' && <Lobby onOpenHowTo={() => setHowTo('menu')} />}
+      {stage === 'lobby' && howTo === 'menu' && (
+        <HowToPlayMenu
+          onRules={() => setHowTo('rules')}
+          onTutorial={() => setHowTo('tutorial')}
+          onBack={() => setHowTo('none')}
+        />
+      )}
+      {stage === 'lobby' && howTo === 'rules' && <RulesPage onExit={() => setHowTo('menu')} />}
+      {stage === 'lobby' && howTo === 'tutorial' && (
+        <TutorialScreen onExit={() => setHowTo('menu')} />
+      )}
       {stage === 'queue' && <QueueScreen />}
       {stage === 'match' && <Match onExit={() => leave()} />}
     </div>
@@ -71,89 +99,98 @@ function NameEntry() {
   const connecting = conn === 'connecting';
 
   return (
-    <div className="panel screen-center" style={{ gap: '1rem' }}>
-      <h2>Play online</h2>
-      <p className="subtitle">Pick a name to enter matchmaking. 4 players per match.</p>
+    <MenuPanel>
       <form
-        className="row"
-        style={{ width: '100%', maxWidth: 360 }}
+        style={{ display: 'contents' }}
         onSubmit={(e) => {
           e.preventDefault();
           playSfx('ui-click');
           void start(name);
         }}
       >
-        <input
-          type="text"
-          value={name}
-          maxLength={24}
-          placeholder="Your name"
-          onChange={(e) => setName(e.target.value)}
-          disabled={connecting}
+        <div className="menu-field" style={{ backgroundImage: `url(${MENU_ART.fieldBlank})` }}>
+          <input
+            type="text"
+            value={name}
+            maxLength={24}
+            placeholder="Your name"
+            aria-label="Your name"
+            onChange={(e) => setName(e.target.value)}
+            disabled={connecting}
+          />
+        </div>
+        <MenuButton
+          type="submit"
+          icon={MENU_ART.plankHelm}
+          label={connecting ? 'Connecting…' : 'Enter'}
+          disabled={connecting || !name.trim()}
         />
-        <button className="btn-primary" type="submit" disabled={connecting || !name.trim()}>
-          {connecting ? 'Connecting…' : 'Connect'}
-        </button>
       </form>
-      {connecting && <span className="spinner" aria-label="Connecting" />}
-    </div>
+      <p className="menu-note">4 players per match</p>
+    </MenuPanel>
   );
 }
 
-function Lobby() {
+function Lobby({ onOpenHowTo }: { onOpenHowTo: () => void }) {
   const name = useOnlineStore((s) => s.identity?.name);
   const joinQueue = useOnlineStore((s) => s.joinQueue);
   const playOffline = useOnlineStore((s) => s.playOffline);
   const leave = useOnlineStore((s) => s.leave);
   return (
-    <div className="panel screen-center" style={{ gap: '1rem' }}>
-      <h2>Connected as {name}</h2>
-      <button
-        className="btn-primary btn-big"
+    <MenuPanel>
+      <MenuButton
+        icon={MENU_ART.plankHelm}
+        label="Find a match"
         onClick={() => {
           playSfx('queue-join');
           joinQueue();
         }}
-      >
-        Find a match
-      </button>
-      <button
-        className="btn-primary btn-big"
+      />
+      <MenuButton
+        icon={MENU_ART.plankSwords}
+        label="Play vs bots"
         onClick={() => {
           playSfx('queue-join');
           playOffline();
         }}
-      >
-        Play offline vs bots
-      </button>
-      <button
-        className="btn-ghost"
+      />
+      <MenuButton
+        icon={MENU_ART.plankBanner}
+        label="How to play"
+        onClick={() => {
+          playSfx('ui-modal-open');
+          onOpenHowTo();
+        }}
+      />
+      <MenuButton
+        icon={MENU_ART.plankDoor}
+        label="Sign out"
         onClick={() => {
           playSfx('ui-click');
           leave();
         }}
-      >
-        Sign out
-      </button>
-    </div>
+      />
+      <p className="menu-note">Signed in as {name}</p>
+    </MenuPanel>
   );
 }
 
 function QueueScreen() {
   const leaveQueue = useOnlineStore((s) => s.leaveQueue);
   return (
-    <div className="panel screen-center" style={{ gap: '1rem' }}>
-      <h2>Searching for players…</h2>
-      <span className="spinner" aria-label="Searching" />
-      <p className="subtitle">Waiting for 4 players to be matched.</p>
-      <button
+    <MenuPanel>
+      <p className="menu-note menu-spinner-row">
+        <span className="spinner" aria-label="Searching" /> Searching for players…
+      </p>
+      <MenuButton
+        icon={MENU_ART.plankDoor}
+        label="Leave queue"
         onClick={() => {
           playSfx('ui-click');
           leaveQueue();
         }}
-      >
-        Leave queue
-      </button>
-    </div>
+      />
+      <p className="menu-note">Waiting for 4 players</p>
+    </MenuPanel>
   );
 }

@@ -9,8 +9,8 @@ import java.util.Random;
 /** The face-down draw pile: an ordered stack of already-shuffled cards drawn from the top. Composition lives in CardFactory. Per the game rules, a game can end when this pile runs out, so callers should check isEmpty() rather than relying on draw() to signal exhaustion. */
 public class Deck {
 
-    /** Default number of 7-card units in a standard deck: 16 units = 112 cards. */
-    public static final int DEFAULT_UNITS = 16;
+    /** Default number of 8-card units in a standard deck: 14 units = 112 cards. */
+    public static final int DEFAULT_UNITS = 14;
 
     private final Deque<Card> drawPile;
 
