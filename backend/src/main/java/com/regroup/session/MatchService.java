@@ -368,6 +368,14 @@ public class MatchService {
         }
         synchronized (match) {
             int seat = match.seatOf(playerId);
+            // The client only ever sends .resume when it already knows it's mid-match (a network
+            // blip while the tab stayed open) — never after a plain sign-in or a fresh page load,
+            // since neither keeps matchId in memory. So this, not the raw STOMP CONNECT, is the
+            // real signal that the player is back in this match rather than starting over.
+            if (seat >= 0 && !match.isConnected(seat)) {
+                match.setConnected(seat, true);
+                broadcast(match, new Messages.PlayerNotice("PLAYER_RECONNECTED", playerId));
+            }
             MatchEngine engine = match.engine();
 
             List<Messages.PlayerState> playerStates = new ArrayList<>();
@@ -387,18 +395,54 @@ public class MatchService {
         }
     }
 
-    /** Presence: STOMP session connected. Recognizes a reconnecting player by their seat. */
-    public void onPlayerConnected(String playerId) {
-        LiveMatch match = activeMatchOf(playerId);
+    /**
+     * A player deliberately forfeits a match instead of just disconnecting. The match itself
+     * is untouched: the seat keeps playing via the existing turn-timeout auto-play, exactly as
+     * it would for a disconnect. The only difference from a plain disconnect is that we free the
+     * player up immediately (rather than only once the match finishes) so they can queue again.
+     */
+    public void leaveMatch(String playerId, String matchId) {
+        LiveMatch match = requireMatch(playerId, matchId);
         if (match == null) {
             return;
         }
         synchronized (match) {
             int seat = match.seatOf(playerId);
-            if (seat >= 0 && !match.isConnected(seat)) {
-                match.setConnected(seat, true);
-                broadcast(match, new Messages.PlayerNotice("PLAYER_RECONNECTED", playerId));
+            if (seat >= 0 && match.isConnected(seat)) {
+                match.setConnected(seat, false);
+                broadcast(match, new Messages.PlayerNotice("PLAYER_DISCONNECTED", playerId));
             }
+            matchIdByPlayerId.remove(playerId, matchId);
+        }
+    }
+
+    /**
+     * A closed tab/browser never runs client JS, so it can't call {@link #leaveMatch}; the only
+     * server-side signal is the WS session disconnecting, which (by design, see
+     * {@link #onPlayerDisconnected}) just flags the seat and lets the match carry on. Without
+     * this, that player's {@code matchIdByPlayerId} entry would linger until the abandoned match
+     * finishes on its own, and every {@code queue.join}/{@code queue.joinOffline} until then would
+     * be rejected with "Already in an active match". So: when they try to queue again, if their
+     * tagged match is one they're no longer connected to, treat it as an implicit forfeit instead
+     * of blocking them. A still-connected match (e.g. open in another tab) keeps blocking, since
+     * that one really is still in progress for them.
+     */
+    public boolean forfeitIfAbandoned(String playerId) {
+        String matchId = matchIdByPlayerId.get(playerId);
+        if (matchId == null) {
+            return false;
+        }
+        LiveMatch match = matchesById.get(matchId);
+        if (match == null || match.isFinished()) {
+            return false;
+        }
+        synchronized (match) {
+            int seat = match.seatOf(playerId);
+            if (seat >= 0 && match.isConnected(seat)) {
+                return false;
+            }
+            matchIdByPlayerId.remove(playerId, matchId);
+            return true;
         }
     }
 

@@ -359,6 +359,22 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
             set({ conn: 'reconnecting' });
           }
         },
+        // The socket has already stopped retrying by the time this fires (see
+        // socket.ts). Most likely cause is a token from a previous server run
+        // (e.g. the backend restarted) — drop it so the next Enter click
+        // registers fresh instead of replaying the same dead token forever.
+        onFatalError: (message) => {
+          console.warn('Online connection failed:', message);
+          clearIdentity();
+          socket = null;
+          playSfx('ui-error');
+          set({
+            conn: 'failed',
+            stage: 'name',
+            identity: null,
+            error: { code: 'CONNECT_FAILED', message: 'Your session expired — please sign in again.' },
+          });
+        },
         onPrivateMessage: handlePrivate,
         onMatchMessage: handleTopic,
       });
@@ -440,6 +456,12 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
       dismissError: () => set({ error: null }),
 
       leave: () => {
+        const s = get();
+        // Tell the server we're forfeiting so it frees us up to queue again;
+        // harmless no-op if the match already finished or there wasn't one.
+        if (s.matchId) {
+          socket?.publish(`/app/match.${s.matchId}.leave`, {});
+        }
         socket?.deactivate();
         socket = null;
         set({ conn: 'idle', stage: 'name', error: null, ...MATCH_RESET });

@@ -27,7 +27,7 @@ public class MatchmakingService {
     }
 
     public void join(String playerId) {
-        if (matchService.isInActiveMatch(playerId)) {
+        if (matchService.isInActiveMatch(playerId) && !matchService.forfeitIfAbandoned(playerId)) {
             matchService.sendError(playerId, "BAD_STATE", "Already in an active match");
             return;
         }
@@ -55,7 +55,7 @@ public class MatchmakingService {
      * instead of waiting in the real queue. The human takes seat 0; bots take seats 1-3.
      */
     public void joinOffline(String playerId) {
-        if (matchService.isInActiveMatch(playerId)) {
+        if (matchService.isInActiveMatch(playerId) && !matchService.forfeitIfAbandoned(playerId)) {
             matchService.sendError(playerId, "BAD_STATE", "Already in an active match");
             return;
         }

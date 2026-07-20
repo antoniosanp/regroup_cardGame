@@ -4,7 +4,6 @@ import com.regroup.matchmaking.MatchmakingService;
 import com.regroup.session.MatchService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
@@ -19,14 +18,6 @@ public class PresenceListener {
     public PresenceListener(MatchmakingService matchmaking, MatchService matchService) {
         this.matchmaking = matchmaking;
         this.matchService = matchService;
-    }
-
-    @EventListener
-    public void onConnected(SessionConnectedEvent event) {
-        Principal user = event.getUser();
-        if (user != null) {
-            matchService.onPlayerConnected(user.getName());
-        }
     }
 
     @EventListener

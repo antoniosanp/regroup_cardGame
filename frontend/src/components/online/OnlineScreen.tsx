@@ -54,24 +54,26 @@ export function OnlineScreen() {
       {/* No <h1> title: the menu panel's background art has the logo painted into it,
           and every non-match screen now renders inside that panel. */}
 
-      {conn === 'reconnecting' && (
-        <div className="banner banner-warn" role="status">
-          <span className="spinner" /> Connection lost — reconnecting…
-        </div>
-      )}
-      {error && (
-        <div className="banner banner-error" role="alert">
-          <span>{error.message || error.code}</span>
-          <button
-            onClick={() => {
-              playSfx('ui-click');
-              dismissError();
-            }}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      <div className="banner-stack">
+        {conn === 'reconnecting' && (
+          <div className="banner banner-warn" role="status">
+            <span className="spinner" /> Connection lost — reconnecting…
+          </div>
+        )}
+        {error && (
+          <div className="banner banner-error" role="alert">
+            <span>{error.message || error.code}</span>
+            <button
+              onClick={() => {
+                playSfx('ui-click');
+                dismissError();
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+      </div>
 
       {stage === 'name' && <NameEntry />}
       {stage === 'lobby' && howTo === 'none' && <Lobby onOpenHowTo={() => setHowTo('menu')} />}
@@ -126,13 +128,11 @@ function NameEntry() {
           disabled={connecting || !name.trim()}
         />
       </form>
-      <p className="menu-note">4 players per match</p>
     </MenuPanel>
   );
 }
 
 function Lobby({ onOpenHowTo }: { onOpenHowTo: () => void }) {
-  const name = useOnlineStore((s) => s.identity?.name);
   const joinQueue = useOnlineStore((s) => s.joinQueue);
   const playOffline = useOnlineStore((s) => s.playOffline);
   const leave = useOnlineStore((s) => s.leave);
@@ -170,7 +170,6 @@ function Lobby({ onOpenHowTo }: { onOpenHowTo: () => void }) {
           leave();
         }}
       />
-      <p className="menu-note">Signed in as {name}</p>
     </MenuPanel>
   );
 }

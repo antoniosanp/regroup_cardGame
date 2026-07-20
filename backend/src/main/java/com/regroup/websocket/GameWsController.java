@@ -64,4 +64,9 @@ public class GameWsController {
     public void resume(@DestinationVariable String matchId, Principal principal) {
         matchService.resume(principal.getName(), matchId);
     }
+
+    @MessageMapping("match.{matchId}.leave")
+    public void leave(@DestinationVariable String matchId, Principal principal) {
+        matchService.leaveMatch(principal.getName(), matchId);
+    }
 }

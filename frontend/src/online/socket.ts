@@ -10,6 +10,13 @@ export interface GameSocketHandlers {
   onConnect: () => void;
   /** Fired when the underlying socket drops; the client keeps retrying. */
   onDisconnect: () => void;
+  /**
+   * Fired when the connection cannot succeed on its own: the broker rejected
+   * CONNECT (e.g. a stale token from a previous server run) or nothing
+   * answered within the connect timeout. Retrying is stopped before this
+   * fires, since replaying the same bad token forever would just hang.
+   */
+  onFatalError: (message: string) => void;
   onPrivateMessage: (raw: unknown) => void;
   onMatchMessage: (raw: unknown) => void;
 }
@@ -25,10 +32,17 @@ export interface GameSocket {
 
 export type GameSocketFactory = () => GameSocket;
 
+// If CONNECT hasn't succeeded by the time this fires, something is wrong that a
+// STOMP ERROR frame won't necessarily tell us about (e.g. the server is simply
+// unreachable) — treat it the same as an explicit rejection rather than let the
+// UI wait on "Connecting…" forever.
+const CONNECT_TIMEOUT_MS = 8000;
+
 export class StompGameSocket implements GameSocket {
   private client: Client | null = null;
   private handlers: GameSocketHandlers | null = null;
   private matchId: string | null = null;
+  private connectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   activate(token: string, handlers: GameSocketHandlers): void {
     this.handlers = handlers;
@@ -37,13 +51,33 @@ export class StompGameSocket implements GameSocket {
       connectHeaders: { token },
       reconnectDelay: 2000,
       onConnect: () => {
+        this.clearConnectTimeout();
         this.subscribePrivate();
         if (this.matchId) this.doSubscribeMatch(this.matchId);
         handlers.onConnect();
       },
       onWebSocketClose: () => handlers.onDisconnect(),
+      onStompError: (frame) => {
+        this.clearConnectTimeout();
+        void this.client?.deactivate();
+        handlers.onFatalError(frame.headers?.message || 'Connection rejected');
+      },
     });
     this.client.activate();
+    this.connectTimeout = setTimeout(() => {
+      this.connectTimeout = null;
+      if (!this.client?.connected) {
+        void this.client?.deactivate();
+        handlers.onFatalError('Could not reach the server');
+      }
+    }, CONNECT_TIMEOUT_MS);
+  }
+
+  private clearConnectTimeout(): void {
+    if (this.connectTimeout !== null) {
+      clearTimeout(this.connectTimeout);
+      this.connectTimeout = null;
+    }
   }
 
   private subscribePrivate(): void {
@@ -73,6 +107,7 @@ export class StompGameSocket implements GameSocket {
   }
 
   deactivate(): void {
+    this.clearConnectTimeout();
     this.matchId = null;
     void this.client?.deactivate();
     this.client = null;

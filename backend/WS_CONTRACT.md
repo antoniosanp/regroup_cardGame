@@ -23,13 +23,14 @@ token reconnecting is recognized as the same player. WebSocket endpoint: `/ws`.
 
 | Destination | Payload | Meaning |
 |---|---|---|
-| `/app/queue.join` | `{}` | Enter the 4-player queue |
-| `/app/queue.joinOffline` | `{}` | Start an offline match immediately: you take seat 0, seats 1-3 are filled by server-driven "easy" AI bots (display names `"Bot 1"`/`"Bot 2"`/`"Bot 3"`). No queue wait. Bots drive the identical `CARD_PICKED`/`CARD_PLACED`/`TURN_START`/etc. broadcasts a human would — no new wire shapes; the client renders their turns like any other player's. |
+| `/app/queue.join` | `{}` | Enter the 4-player queue. Rejected with `BAD_STATE` if the player is still connected elsewhere to a match already in progress; if they're tagged as being in a match but no longer connected to it (closed the tab without leaving), that old match is implicitly forfeited first and the join proceeds. |
+| `/app/queue.joinOffline` | `{}` | Start an offline match immediately: you take seat 0, seats 1-3 are filled by server-driven "easy" AI bots (display names `"Bot 1"`/`"Bot 2"`/`"Bot 3"`). No queue wait. Bots drive the identical `CARD_PICKED`/`CARD_PLACED`/`TURN_START`/etc. broadcasts a human would — no new wire shapes; the client renders their turns like any other player's. Same implicit-forfeit rule as `queue.join`. |
 | `/app/queue.leave` | `{}` | Leave the queue before a match forms |
 | `/app/match.{matchId}.pick` | `{"slot":"A"\|"B"\|"C"\|"DECK"}` | Pick a card: A/B/C from the market (priced 0/1/2 coins, or all free during the final round — see below) or the free face-down deck top. Must be this player's turn and no card already held. |
 | `/app/match.{matchId}.rotate` | `{}` | Rotate the currently held card 90° clockwise. |
 | `/app/match.{matchId}.place` | `{"corner":"TOP_LEFT"\|"TOP_RIGHT"\|"BOTTOM_LEFT"\|"BOTTOM_RIGHT","x":<int>,"y":<int>}` | Place the held card, anchoring `corner` at board point `(x,y)`. Ends the turn. |
 | `/app/match.{matchId}.resume` | `{}` | Request a full state snapshot after reconnect. |
+| `/app/match.{matchId}.leave` | `{}` | Forfeit this match: the seat is flagged disconnected (same broadcast as an ordinary disconnect) and keeps getting auto-played by the turn timeout, but the player is immediately freed to `queue.join`/`queue.joinOffline` again instead of waiting for the match to finish. |
 
 ## Server → one client (private, `/user/queue/game`)
 
