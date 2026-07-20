@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Regroup",
+    "slug": "regroup-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#10141c",
+    "android": {
+      "package": "com.regroup.mobile",
+      "usesCleartextTraffic": true
+    },
+    "platforms": ["android", "ios"]
+  }
+}

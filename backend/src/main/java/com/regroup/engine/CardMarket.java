@@ -35,6 +35,16 @@ public class CardMarket {
         return deck.draw();
     }
 
+    /** True once no face-up cards remain; since slots are refilled from the deck, this also implies the deck is empty. */
+    public boolean isExhausted() {
+        return faceUp.isEmpty();
+    }
+
+    /** How many face-up slots currently hold a card (at most 3). */
+    public int filledSlotCount() {
+        return faceUp.size();
+    }
+
     private void refill() {
         while (faceUp.size() < Slot.values().length && !deck.isEmpty()) {
             faceUp.add(deck.draw());

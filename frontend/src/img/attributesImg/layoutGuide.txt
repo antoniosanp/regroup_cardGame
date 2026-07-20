@@ -1,0 +1,315 @@
+===========================================================
+CHICKEN TACTICS - UI LAYOUT DOCUMENT
+===========================================================
+
+STYLE
+-----
+The interface follows a hand-painted fantasy board game aesthetic.
+
+Main visual themes:
+- Warm wood textures
+- Aged parchment
+- Dark iron corner reinforcements
+- Thick cartoon outlines
+- Soft watercolor accents
+- Medieval/fantasy atmosphere
+- Clean readable UI with large clickable elements
+
+The entire HUD is composed of independent reusable pieces.
+
+-----------------------------------------------------------
+1. MAIN PLAY AREA
+-----------------------------------------------------------
+
+Purpose:
+The main battlefield where players place their units/cards.
+
+Visual:
+- Large wooden board
+- Horizontal wooden planks
+- Occupies approximately 70% of the screen
+- No fixed slots
+- Cards can be freely positioned
+
+This area should remain visually clean to avoid distracting from gameplay.
+
+-----------------------------------------------------------
+2. MARKET PANEL (TOP)
+-----------------------------------------------------------
+
+Centered at the top.
+
+Contains:
+
++-----------------------------------------------------+
+|                    MARKET                           |
++-----------------------------------------------------+
+
+Below the title:
+
++-----+ +-----+ +-----+ +-----+
+|     | |     | |     | |     |
+|Card1| |Card2| |Card3| |Card4|
+|     | |     | |     | |     |
++-----+ +-----+ +-----+ +-----+
+
+Purpose:
+
+Displays four cards available for purchase.
+
+The player chooses one of these cards.
+
+Possible interactions:
+- Hover highlight
+- Click to buy
+- Disabled state if insufficient coins
+
+Elements:
+- Wooden frame
+- Four reusable card slots
+- Wooden title sign
+
+-----------------------------------------------------------
+3. OPPONENT BOARD BUTTON
+-----------------------------------------------------------
+
+Position:
+Top-right corner
+
+Purpose:
+Opens a window displaying all opponents' boards.
+
+Visual:
+Small framed wooden panel.
+
+Contains:
+- "Opponent Board" text
+- Wooden sign icon
+
+Interaction:
+Clickable button
+
+Possible future behavior:
+- Opens minimap
+- Opens carousel of opponents
+- Spectator mode
+
+-----------------------------------------------------------
+4. PLAYER PANEL
+-----------------------------------------------------------
+
+Position:
+Bottom-left
+
+Purpose:
+Shows the current player's information.
+
+Contains:
+
++----------------------------+
+| ❤️ HP                 20   |
+|                            |
+|      Character Portrait    |
+|                            |
+| 🧪 Potions      Coins 🪙    |
++----------------------------+
+
+Character portrait:
+Large square image of the current hero.
+
+Stats:
+
+Top Left
+---------
+Health
+
+Bottom Left
+-----------
+Healing Potions
+
+Bottom Right
+------------
+Coins
+
+This panel is intended to immediately communicate the player's state.
+
+-----------------------------------------------------------
+5. PLAYER STATS PANEL
+-----------------------------------------------------------
+
+Position:
+Bottom center-left
+
+Contains four permanent stats.
+
+Layout:
+
++-----------+-----------+
+| Sword | 3 | Wand  | 3 |
++-----------+-----------+
+|Shield | 4 | Ice   | 2 |
++-----------+-----------+
+
+Stats:
+
+⚔ Sword
+--------
+Physical attack
+
+🪄 Magic Wand
+-------------
+Magic attack
+
+🛡 Shield
+---------
+Armor / Defense
+
+🧊 Ice Block
+------------
+Magic defense
+(or resistance depending on gameplay)
+
+Important:
+
+The displayed values are whole integers.
+
+Correct:
+3
+
+Incorrect:
+3/3
+
+Each stat uses:
+- Icon
+- Number
+
+No progress bars.
+
+-----------------------------------------------------------
+6. HAND SLOT
+-----------------------------------------------------------
+
+Position:
+Bottom center
+
+Purpose:
+Displays the player's current card.
+
+Rules:
+- Only ONE card can be held.
+- Empty by default.
+- Clicking may inspect the card.
+
+Visual:
+Large decorative card slot.
+
+-----------------------------------------------------------
+7. RESOURCE ICONS
+-----------------------------------------------------------
+
+The UI uses consistent collectible icons.
+
+Resources:
+
+❤️ Heart
+Health
+
+🪙 Gold Coin
+Currency
+
+🧪 Potion
+Healing
+
+⚔ Sword
+Attack
+
+🪄 Wand
+Magic
+
+🛡 Shield
+Defense
+
+🧊 Ice Block
+Magic Defense / Resistance
+
+Each icon is independent for reuse.
+
+-----------------------------------------------------------
+8. REUSABLE UI ASSETS
+-----------------------------------------------------------
+
+The sprite sheet contains reusable pieces.
+
+Structural Elements
+-------------------
+- Large wooden board
+- Bottom HUD panel
+- Market frame
+- Opponent panel
+- Wooden title sign
+- Decorative metal corners
+- Vertical border poles
+- Wooden separators
+
+Card Components
+---------------
+- Empty card frame
+- Card slot
+- Hand slot
+- Character portrait frame
+
+Icons
+-----
+- Heart
+- Potion
+- Coin
+- Sword
+- Wand
+- Shield
+- Ice Block
+
+Decorative Pieces
+-----------------
+- Corner brackets
+- Metal reinforcements
+- Wooden trims
+- Border lines
+- Decorative connectors
+
+-----------------------------------------------------------
+9. RECOMMENDED SCREEN HIERARCHY
+-----------------------------------------------------------
+
++----------------------------------------------------------+
+| MARKET                                       Opponent    |
+| [Card][Card][Card][Card]                     Board Button|
++----------------------------------------------------------+
+
+|                                                          |
+|                                                          |
+|                                                          |
+|                  MAIN WOODEN BOARD                        |
+|                                                          |
+|                                                          |
+|                                                          |
+
++----------------------------------------------------------+
+| Player | Stats (Sword/Wand/Shield/Ice) | Hand Slot       |
++----------------------------------------------------------+
+
+-----------------------------------------------------------
+10. DESIGN PRINCIPLES
+-----------------------------------------------------------
+
+- Large clickable elements
+- Readable from a distance
+- Minimal text
+- Icon-driven information
+- Warm fantasy colors
+- Consistent wood + parchment materials
+- Thick outlines
+- Slightly exaggerated cartoon proportions
+- Every UI piece should be reusable independently
+- Cards should always be the visual focus of the interface
+
+===========================================================

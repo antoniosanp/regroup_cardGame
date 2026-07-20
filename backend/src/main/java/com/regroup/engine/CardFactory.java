@@ -86,16 +86,17 @@ public class CardFactory {
         return buildCard(corners);
     }
 
-    /** Randomizes which of the four positions each attribute lands on, then applies a random rotation. */
+    /**
+     * Randomizes which of the four positions each attribute lands on. That alone already makes each
+     * card's layout unpredictable, so cards start at DEG_0 — an extra random rotation on top would be
+     * purely cosmetic (rotation is a player action during placement, per gameRules.md) and would leave
+     * freshly-dealt cards, including ones still sitting in the market, rendered visibly tilted for no
+     * reason.
+     */
     private Card buildCard(List<CornerAttribute> fourCorners) {
         List<CornerAttribute> shuffled = new ArrayList<>(fourCorners);
         Collections.shuffle(shuffled, random);
-        Card card = new Card(shuffled.get(0), shuffled.get(1), shuffled.get(2), shuffled.get(3));
-        int rotations = random.nextInt(4);
-        for (int i = 0; i < rotations; i++) {
-            card.rotate();
-        }
-        return card;
+        return new Card(shuffled.get(0), shuffled.get(1), shuffled.get(2), shuffled.get(3));
     }
 
     private static CornerAttribute plus1(StatCategory category) {

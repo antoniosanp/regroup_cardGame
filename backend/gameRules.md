@@ -6,7 +6,7 @@ This is a four-player game. Each player has the following stats:
 
 | Stat | Abbreviation | Starting value |
 |------|--------------|-----------------|
-| Health Points | hp | 30 |
+| Health Points | hp | 30 (max 30) |
 | Physical Attack | pa | 0 |
 | Physical Defense | pd | 0 |
 | Magic Attack | ma | 0 |
@@ -103,6 +103,13 @@ The defending player takes damage. If their hp drops below 1, they lose and take
 
 **Note:** Even if a player dies during the battle phase, they still get to attack that round — so it's possible for two players to kill each other in the same round. In the event of such a mutual kill, the player who ends with the higher (less negative) hp wins the exchange. For example, if player one dies at -3hp and player two dies at -5hp, player one wins.
 
+## Final Round
+
+Checked at the start of each round: if the face-up market and the deck together hold
+fewer than 7 cards, that round is the **final round** — every market slot (A/B/C) is
+free for that round, and once it resolves (placements, then the battle phase), the
+game ends immediately: the player with the highest hp wins, ties share the win.
+
 ## End of Game
 
-The game ends when only one player remains, or when the deck runs out of cards. In the latter case, the player with the highest hp wins.
+The game ends when only one player remains, the final round (above) resolves, or the deck runs out of cards. In the latter two cases, the player with the highest hp wins.

@@ -1,0 +1,1251 @@
+:root {
+  /* Wood / parchment palette sampled from img/attributesImg — replaces the
+     old flat dark-UI theme now that the match screen is built on that art. */
+  --wood-dark: #3f2413;
+  --wood: #7a4a24;
+  --wood-light: #a3703f;
+  --parchment: #ecd8a6;
+  --parchment-dark: #d7bd85;
+  --iron: #2b241f;
+  --iron-light: #6b625c;
+  --gold: #d9b64f;
+  --text: #2c1c10;
+  --text-light: #f5ead0;
+  --muted: #8a7355;
+  --accent: #c94a2f;
+  --good: #3f8f4f;
+  --bad: #b23a3a;
+  --warn: #b8860b;
+  --error: #a33;
+  font-family: 'Georgia', 'Iowan Old Style', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--wood-dark);
+  color: var(--text-light);
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.screen {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 4rem;
+  color: var(--text-light);
+}
+
+/* The match itself is meant to fit in one viewport, no page scrolling: fixed
+   height, tight padding, and .match below lays its sections out as a column
+   where only the board area is allowed to grow/shrink. */
+.screen-match {
+  height: 100dvh;
+  max-width: 1400px;
+  padding: 0.4rem 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: url('./img/attributesImg/boardBackground.png') center / cover no-repeat, var(--parchment);
+}
+
+.screen-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Fixed to the viewport (not .screen) so it stays put across every stage,
+   including inside .screen-match's own overflow:hidden layout. */
+.mute-toggle {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 50;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.title {
+  font-size: 1.8rem;
+  margin: 0.5rem 0 1rem;
+  color: var(--gold);
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
+}
+
+.subtitle {
+  color: var(--parchment-dark);
+  margin: 0;
+}
+
+.hint {
+  color: var(--muted);
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.panel {
+  background: var(--parchment-dark);
+  color: var(--text);
+  border: 3px solid var(--wood);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem auto;
+  max-width: 480px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+button {
+  background: linear-gradient(160deg, var(--wood-light), var(--wood-dark));
+  color: var(--text-light);
+  border: 2px solid var(--iron);
+  border-radius: 6px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Same look as button:disabled, for buttons that stay natively enabled (not
+   [disabled]) so they can still receive a click - e.g. market slots, which
+   play pick-denied on click instead of doing nothing. */
+button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button[aria-disabled='true']:hover {
+  border-color: var(--iron);
+}
+
+.btn-primary {
+  background: linear-gradient(160deg, var(--accent), #8a2f1c);
+  border-color: var(--gold);
+  color: #fff;
+}
+
+.btn-big {
+  padding: 0.7rem 1.4rem;
+  font-size: 1rem;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--wood);
+  color: var(--text);
+}
+
+input {
+  flex: 1;
+  background: var(--parchment);
+  color: var(--text);
+  border: 2px solid var(--wood);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.95rem;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.banner-warn {
+  background: #3a2f13;
+  border: 1px solid var(--warn);
+  color: var(--text-light);
+}
+
+.banner-error {
+  background: #3a1a1a;
+  border: 1px solid var(--error);
+  color: var(--text-light);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+  margin-right: 0.4rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Match layout: top bar (timer / market / opponent button), a slim status
+   strip, the board (the one section allowed to grow/shrink), and the bottom
+   HUD bar — matching img/attributesImg/boardLayout.png's structure. */
+.match {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.match-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.market-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.opponent-board-btn {
+  flex: 0 0 auto;
+  width: 110px;
+  aspect-ratio: 183 / 223;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+.opponent-board-btn:hover {
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) brightness(1.06);
+}
+
+.match-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  background: rgba(60, 38, 20, 0.55);
+  border: 1px solid var(--wood);
+  border-radius: 6px;
+  padding: 0.15rem 0.6rem;
+  color: var(--text-light);
+}
+
+.round-label {
+  font-weight: 600;
+  font-size: 0.76rem;
+}
+
+.turn-indicator {
+  flex: 1;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 0.76rem;
+}
+
+/* Ghost buttons inherit dark parchment text, unreadable on this dark strip. */
+.match-status .btn-ghost {
+  color: var(--text-light);
+  border-color: var(--parchment-dark);
+  background: rgba(20, 12, 6, 0.45);
+  font-size: 0.76rem;
+  padding: 0.25rem 0.6rem;
+}
+
+.match-status .btn-ghost:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.section {
+  background: var(--parchment-dark);
+  color: var(--text);
+  border: 2px solid var(--wood);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  flex: 0 0 auto;
+}
+
+.section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+/* Modal (opponent boards) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 6, 3, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal-panel {
+  background: var(--parchment-dark);
+  color: var(--text);
+  border: 3px solid var(--wood);
+  border-radius: 12px;
+  padding: 1rem;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Fixed dimensions: switching between opponents must not resize the modal,
+   whatever the size of each one's board. The board region scrolls instead. */
+.modal-panel-opponents {
+  width: min(680px, 90vw);
+  height: min(620px, 85vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--wood-dark);
+}
+
+.opponent-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.opponent-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--parchment);
+  border: 2px solid var(--wood);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+
+.opponent-tab-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold) inset;
+}
+
+.opponent-tab-dead {
+  opacity: 0.5;
+}
+
+.opponent-tab-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--iron);
+}
+
+.opponent-tab-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.opponent-tab-flags {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.opponent-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.opponent-detail .board {
+  flex: 1;
+  min-height: 0;
+}
+
+.stats-row-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--parchment);
+  border: 1px solid var(--wood);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.stat-icon img {
+  width: 18px;
+  height: 18px;
+}
+
+.flag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.flag-turn {
+  background: var(--accent);
+  color: #fff;
+}
+
+.flag-hold {
+  background: #6b4bb8;
+  color: #fff;
+}
+
+.flag-out {
+  background: var(--error);
+  color: #fff;
+}
+
+.flag-off {
+  background: #444;
+  color: #ddd;
+}
+
+/* Turn timer plaque (top-left corner, previously empty in boardLayout.png) */
+.turn-timer {
+  flex: 0 0 auto;
+  width: 110px;
+  aspect-ratio: 245 / 255;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  color: var(--text);
+  padding: 0.4rem;
+  text-align: center;
+}
+
+.turn-timer-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.turn-timer-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turn-timer-low .turn-timer-value {
+  color: var(--bad);
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+/* Market. marketFrame.png is 1063x288; CSS padding percentages always
+   resolve against the box's WIDTH (even padding-top/bottom), so these are
+   the image's true window-vs-border proportions (measured in px on the
+   source art then reexpressed as %-of-width) rather than %-of-height —
+   using %-of-height numbers here would blow the box's padding budget way
+   past its aspect-ratio height and force it much taller than intended. */
+.market {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  aspect-ratio: 1063 / 288;
+  width: 100%;
+  /* Capped so the art's painted card windows stay a near-constant size on any
+     screen — uncapped, wide viewports scale the windows up while the cards
+     inside stay fixed-px, leaving them swimming in their squares. */
+  max-width: 860px;
+  margin: 0 auto;
+  /* No padding here: %-padding resolves against the PARENT's width, not this
+     element's capped width, which silently shifted the slot grid off the
+     painted windows. The window inset lives on .market-slots in cqw units
+     instead (cqw = 1% of this element's own width, the reference the art
+     proportions actually need — and cq units only resolve that way on a
+     descendant, on the container itself they'd fall back to the viewport). */
+  padding: 0;
+  display: flex;
+  container-type: inline-size;
+}
+
+.market .card {
+  grid-template-columns: repeat(2, 5.6cqw);
+  grid-template-rows: repeat(2, 5.6cqw);
+  gap: 0.7cqw;
+  padding: 0.45cqw;
+}
+
+.market .card-empty,
+.market .card-back {
+  width: 12.8cqw;
+  height: 12.8cqw;
+}
+
+/* Tracks mirror the art's actual painted windows and gaps, measured on
+   marketFrame.png (1063px wide): windows at x 63-273, 303-516, 552-768,
+   801-1008 → widths 210/213/216/207 with 30/36/33 gaps. Slots occupy the
+   window tracks (1/3/5/7); the gap tracks stay empty. The cqw padding is the
+   same measurement's outer border (left 63, right 55, top ~62, bottom ~40,
+   each as a fraction of the 1063 width). */
+.market-slots {
+  display: grid;
+  grid-template-columns: 210fr 30fr 213fr 36fr 216fr 33fr 207fr;
+  padding: 5.8cqw 5.2cqw 3.7cqw 5.9cqw;
+  width: 100%;
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+.market-slot:nth-child(1) {
+  grid-column: 1;
+}
+
+.market-slot:nth-child(2) {
+  grid-column: 3;
+}
+
+.market-slot:nth-child(3) {
+  grid-column: 5;
+}
+
+.market-slot:nth-child(4) {
+  grid-column: 7;
+}
+
+.market-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 0;
+  min-width: 0;
+}
+
+.market-slot button {
+  font-size: clamp(0.58rem, 1.45cqw, 0.78rem);
+  padding: 0.28rem 0.6rem;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: repeat(2, 48px);
+  grid-template-rows: repeat(2, 48px);
+  gap: 6px;
+  background: var(--iron);
+  padding: 4px;
+  border-radius: 8px;
+  border: 2px solid var(--wood-dark);
+}
+
+.corner {
+  background-size: cover;
+  background-position: center;
+  border-radius: 4px;
+  transition: transform 0.2s ease;
+}
+
+.card-empty,
+.card-back {
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-weight: 700;
+  background-color: var(--iron);
+  background-size: cover;
+  background-position: center;
+  border: 2px solid var(--wood-dark);
+  border-radius: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Board */
+.board-zone {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.board-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.border-pole {
+  height: 100%;
+  width: 22px;
+  object-fit: fill;
+  opacity: 0.9;
+  pointer-events: none;
+  flex: 0 0 auto;
+}
+
+.board-wrap {
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+/* The play surface is the visual core of the screen: it takes all the
+   height the other (fixed) sections leave and grows wide — mainBoard.png is
+   wide plank art (873x412), so a wide rectangle matches it, not a square. */
+.board-wrap-self {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  height: 100%;
+  flex: 1;
+  max-width: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+}
+
+.board {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: auto;
+}
+
+.board-empty {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  padding: 0.75rem 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.board-row {
+  display: flex;
+  gap: 5px;
+}
+
+.board-cell {
+  width: 56px;
+  height: 56px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 5px;
+  flex: 0 0 auto;
+}
+
+.board-gap {
+  background: transparent;
+}
+
+.board-cell-droppable {
+  outline: 1px dashed rgba(255, 255, 255, 0.5);
+}
+
+.board-cell-preview {
+  opacity: 0.65;
+  outline: 2px dashed var(--gold);
+}
+
+.board-empty-droppable {
+  border: 2px dashed var(--gold);
+  color: var(--gold);
+}
+
+/* Bottom HUD bar: player portrait/stats + hand slot. Fixed height so the
+   bar never resizes when a held card appears in the hand slot — the board
+   above keeps a stable footprint through the whole turn. */
+.match-bottom {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+  flex: 0 0 auto;
+  height: 176px;
+}
+
+.player-hud {
+  display: flex;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.player-hud-portrait {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 335 / 290;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 4px solid var(--gold);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  background: var(--wood-dark);
+}
+
+.player-hud-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.player-hud-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(20, 10, 5, 0.75);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  color: var(--text-light);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.player-hud-badge img {
+  width: 19px;
+  height: 19px;
+}
+
+.player-hud-badge-hp {
+  top: 4px;
+  left: 4px;
+}
+
+.player-hud-badge-potion {
+  bottom: 4px;
+  left: 4px;
+}
+
+.player-hud-badge-coin {
+  bottom: 4px;
+  right: 4px;
+}
+
+.player-hud-name {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  left: auto;
+  max-width: 60%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-light);
+  background: rgba(20, 10, 5, 0.6);
+  border-radius: 5px;
+  padding: 0.1rem 0.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 0.45rem;
+  width: 190px;
+}
+
+.stat-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(160deg, var(--wood-light), var(--wood-dark));
+  border: 2px solid var(--iron);
+  border-radius: 9px;
+  padding: 0.35rem 0.55rem;
+  color: var(--text-light);
+  font-weight: 800;
+}
+
+.stat-tile-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.stat-tile-value {
+  font-size: 1.15rem;
+}
+
+.hand-slot {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(60, 38, 20, 0.4);
+  border: 2px solid var(--wood);
+}
+
+.hand-slot-empty {
+  width: 100%;
+  height: 100%;
+  min-height: 90px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: auto 100%;
+  opacity: 0.5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.4rem;
+}
+
+/* Card, rotate control and hint sit side by side so the held card always
+   fits the bar's fixed height instead of stacking past it. */
+.held-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  text-align: left;
+  padding: 0.4rem 1rem;
+  max-height: 100%;
+}
+
+/* The hint sits on dark wood, so the default muted-brown .hint color is
+   nearly invisible here — use light parchment text instead. */
+.held-card .hint {
+  max-width: 300px;
+  color: var(--text-light);
+  opacity: 0.9;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.held-card-drag {
+  cursor: grab;
+}
+
+.held-card-drag:active {
+  cursor: grabbing;
+}
+
+/* Animated number tween (HP etc.) */
+.animated-number {
+  font-weight: 800;
+  transition: color 0.25s ease;
+}
+
+.animated-number-down {
+  color: var(--bad);
+}
+
+.animated-number-up {
+  color: var(--good);
+}
+
+/* Battle stage: full-screen overlay grouping BATTLE_RESULT.attacks[] into
+   per-attacker phases. Left = current attacker's square (portrait, PA, MA).
+   Right = a fixed column of every player (portrait, animated HP, PD, MD); the
+   current attacker's own row dims with an "attacking" tag instead of being
+   removed, so rows never reflow mid-battle. Each hit is a single lunge of the
+   attacker square toward the target row plus an impact flash — no flying
+   projectile. All numbers come from the server; this is presentation only. */
+.battle-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 9, 5, 0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  color: var(--text-light);
+}
+
+.battle-stage-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1.25rem;
+  color: var(--gold);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.battle-arena {
+  position: relative;
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+  gap: 1.25rem;
+  background: rgba(60, 38, 20, 0.35);
+  border: 2px solid var(--wood);
+  border-radius: 14px;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+/* Two equal halves: attacker centered in the left half, the defenders
+   column centered in the right half. */
+.battle-attacker-pane {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.battle-attacker {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(160deg, var(--wood-light), var(--wood-dark));
+  border: 3px solid var(--gold);
+  border-radius: 14px;
+  padding: 1rem 0.75rem;
+  will-change: transform;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  min-height: 190px;
+  justify-content: center;
+}
+
+.battle-attacker-avatar {
+  width: 92px;
+  height: 92px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 2px solid var(--iron);
+}
+
+.battle-attacker-name {
+  font-weight: 800;
+  text-align: center;
+  font-size: 0.95rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battle-attacker-stats {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.battle-attacker-placeholder {
+  color: var(--muted);
+  font-size: 2rem;
+  opacity: 0.6;
+}
+
+.battle-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.battle-stat img {
+  width: 20px;
+  height: 20px;
+}
+
+.battle-defenders {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* Each defender is a square tile (mirrors .battle-attacker's shape), stacked
+   in a column — not a full-width row — so it visually reads as "a player",
+   the same way the attacker square does. */
+.battle-defender-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 160px;
+  min-height: 150px;
+  background: rgba(40, 25, 14, 0.55);
+  border: 2px solid var(--wood);
+  border-radius: 12px;
+  padding: 0.6rem 0.5rem;
+  position: relative;
+  transition:
+    opacity 0.25s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.battle-row-attacking {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.battle-row-hit {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 2px var(--bad);
+}
+
+.battle-row-dead {
+  opacity: 0.45;
+  filter: grayscale(0.85);
+}
+
+.battle-row-self {
+  border-color: var(--gold);
+}
+
+.battle-defender-avatar {
+  width: 62px;
+  height: 62px;
+  border-radius: 9px;
+  object-fit: cover;
+  border: 2px solid var(--iron);
+  flex: 0 0 auto;
+}
+
+.battle-defender-info {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.battle-defender-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battle-dead-badge {
+  font-size: 0.85rem;
+}
+
+.battle-defender-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.battle-stat-hp-dead {
+  color: var(--bad);
+}
+
+.battle-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--bad);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.battle-floater {
+  position: absolute;
+  transform: translate(-50%, 0);
+  font-size: 1.2rem;
+  font-weight: 900;
+  pointer-events: none;
+  animation: battle-float 0.9s ease-out forwards;
+  z-index: 5;
+}
+
+.battle-floater-damage {
+  color: #ff8a7a;
+}
+
+.battle-floater-heal {
+  color: #7ee08e;
+}
+
+.battle-floater-blocked {
+  color: var(--muted);
+}
+
+@keyframes battle-float {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -46px);
+  }
+}
+
+/* .btn-ghost's dark parchment text is unreadable on the dark overlay — give
+   the skip button its own light-on-dark treatment. */
+.battle-skip {
+  align-self: center;
+  color: var(--text-light);
+  background: rgba(20, 12, 6, 0.6);
+  border: 2px solid var(--parchment-dark);
+  font-weight: 700;
+}
+
+.battle-skip:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.battle-stage-log {
+  max-height: 35vh;
+  overflow-y: auto;
+}
+
+/* Battle + results tables */
+.battle-panel {
+  background: var(--parchment-dark);
+  color: var(--text);
+  border: 2px solid var(--wood);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+
+.battle-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.battle-table th,
+.battle-table td {
+  border: 1px solid var(--wood);
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+}
+
+.battle-table th {
+  color: var(--wood-dark);
+  font-weight: 700;
+}
+
+.battle-kill {
+  background: rgba(178, 58, 58, 0.25);
+}
+
+.result-winners-row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.result-winner-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 3px solid var(--gold);
+}
+
+.result-row-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: block;
+}
+
+.result-winner {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.result-row-winner {
+  background: rgba(63, 143, 79, 0.25);
+}
