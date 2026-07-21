@@ -27,10 +27,19 @@ function quadrantOf(e: DragEvent<HTMLDivElement>): CornerName {
 export function Match({
   onExit,
   pauseTimer = false,
+  onBattleAnimating,
 }: {
   onExit: () => void;
   /** Freezes the turn countdown. Set by the self-paced tutorial; see TurnTimer's `paused`. */
   pauseTimer?: boolean;
+  /**
+   * Fires whenever the battle-result overlay's kill animation starts or stops playing (i.e.
+   * whenever `overlayBattle` is present and `overlayDone` is still false). Set by the tutorial,
+   * which coaches over the live battle screen and needs to know not to declare a winner —
+   * "You win", Next button and all — while the animation the player is watching hasn't
+   * actually finished yet.
+   */
+  onBattleAnimating?: (animating: boolean) => void;
 }) {
   const self = useOnlineStore((s) => s.identity?.playerId ?? '');
   const players = useOnlineStore((s) => s.players);
@@ -63,8 +72,10 @@ export function Match({
   // The server's battle-phase pause is only a best-effort estimate of the client
   // animation's real length. Capturing the battle here (instead of rendering
   // straight off the store's lastBattle) lets the overlay outlive a ROUND_START
-  // that arrives before BattleStage says it's actually finished, so a fast
-  // server / slow client never cuts off the last attacker's last hits.
+  // or MATCH_RESULT that arrives before BattleStage says it's actually finished,
+  // so a fast server / slow client never cuts off the last attacker's last hits
+  // — including the kill blow that ends the match, which is why the MATCH_OVER
+  // check below also waits on overlayDone before handing off to ResultScreen.
   const [overlayBattle, setOverlayBattle] = useState<BattleVM | null>(null);
   const [overlayDone, setOverlayDone] = useState(false);
 
@@ -81,7 +92,11 @@ export function Match({
     }
   }, [overlayDone, phase, overlayBattle]);
 
-  if (phase === 'MATCH_OVER') {
+  useEffect(() => {
+    onBattleAnimating?.(Boolean(overlayBattle) && !overlayDone);
+  }, [overlayBattle, overlayDone, onBattleAnimating]);
+
+  if (phase === 'MATCH_OVER' && (!overlayBattle || overlayDone)) {
     const youWon = winners?.includes(self) ?? false;
     return (
       <ResultScreen players={players} winners={winners} reason={reason} youWon={youWon} onExit={onExit} />

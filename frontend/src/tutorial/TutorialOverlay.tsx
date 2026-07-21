@@ -15,9 +15,16 @@ interface TutorialOverlayProps {
   domRevision: string;
   onNext: () => void;
   onExit: () => void;
+  /**
+   * True while Match's battle-result kill animation is still playing. The blocker stays up
+   * (there's nothing to interact with mid-fight anyway), but the coach box itself — title,
+   * text, and the Next button that would otherwise let the player click straight past a
+   * "You win" step before the animation finishes — is withheld until it flips back to false.
+   */
+  hideCoach?: boolean;
 }
 
-export function TutorialOverlay({ view, domRevision, onNext, onExit }: TutorialOverlayProps) {
+export function TutorialOverlay({ view, domRevision, onNext, onExit, hideCoach }: TutorialOverlayProps) {
   const { step, index, total } = view;
 
   useLayoutEffect(() => {
@@ -46,25 +53,27 @@ export function TutorialOverlay({ view, domRevision, onNext, onExit }: TutorialO
         // Off-script clicks should feel deliberately refused rather than dead.
         onPointerDownCapture={() => playSfx('pick-denied')}
       />
-      <div className={`tutorial-coach tutorial-coach-${step.dock}`}>
-        <div className="tutorial-coach-step">
-          Step {index + 1} of {total}
-        </div>
-        <h3 className="tutorial-coach-title">{step.title}</h3>
-        <p className="tutorial-coach-text">{step.text}</p>
-        <div className="tutorial-coach-actions">
-          <button className="btn-ghost" onClick={onExit}>
-            Exit tutorial
-          </button>
-          {waitingOnPlayer ? (
-            <span className="tutorial-coach-waiting">Your move — follow the highlight</span>
-          ) : (
-            <button className="btn-primary" onClick={onNext}>
-              Next
+      {!hideCoach && (
+        <div className={`tutorial-coach tutorial-coach-${step.dock}`}>
+          <div className="tutorial-coach-step">
+            Step {index + 1} of {total}
+          </div>
+          <h3 className="tutorial-coach-title">{step.title}</h3>
+          <p className="tutorial-coach-text">{step.text}</p>
+          <div className="tutorial-coach-actions">
+            <button className="btn-ghost" onClick={onExit}>
+              Exit tutorial
             </button>
-          )}
+            {waitingOnPlayer ? (
+              <span className="tutorial-coach-waiting">Your move — follow the highlight</span>
+            ) : (
+              <button className="btn-primary" onClick={onNext}>
+                Next
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

@@ -36,14 +36,17 @@ export const SEL = {
   targetCell: '.board-cell[title^="(1, 1) "]',
 } as const;
 
-// Your board at the start: the two PA_1s are orthogonally adjacent so they count
-// (pa 2), while the lone COINS_2 touches nothing — which is exactly the point the
-// adjacency step makes.
+// Your board at the start: the two PA_1s at (0,0)/(1,0) are orthogonally adjacent
+// so they count (pa 2). The COINS_2 at (0,1) and the MA_1 at (1,1) both touch
+// nothing of their own kind — the coins still count regardless (coins always do),
+// but the magic attack corner is dead weight, which is exactly the point the
+// adjacency step makes, and exactly why it's the one the lesson card overwrites:
+// it's the only tile on the board contributing nothing already.
 const YOUR_BOARD: BoardPoint[] = [
-  { x: 0, y: 0, attribute: 'EMPTY' },
-  { x: 1, y: 0, attribute: 'COINS_2' },
-  { x: 0, y: 1, attribute: 'PA_1' },
-  { x: 1, y: 1, attribute: 'PA_1' },
+  { x: 0, y: 0, attribute: 'PA_1' },
+  { x: 1, y: 0, attribute: 'PA_1' },
+  { x: 0, y: 1, attribute: 'COINS_2' },
+  { x: 1, y: 1, attribute: 'MA_1' },
 ];
 
 // Cosmetic only — visible if the player opens the opponent-boards modal.
@@ -55,40 +58,48 @@ const GORN_BOARD: BoardPoint[] = [
 ];
 
 // Slot A is free but deliberately weak, so "free isn't always right" is a real lesson.
+// A real EMPTY-shape card (CardFactory: one coin/empty corner + the three stat categories
+// other than the omitted one, all at +1) that omits PA, so it never carries a physical
+// attack corner — the one stat that matters for finishing Gorn this turn.
 const MARKET_A: Card = {
-  topLeft: 'MD_1',
-  topRight: 'EMPTY',
-  bottomLeft: 'EMPTY',
-  bottomRight: 'MD_1',
-  rotation: 'DEG_0',
-};
-
-// The card the lesson is built around. PA_2 sits bottom-left, so exactly one
-// clockwise rotation (rotateCornersOnce sets topLeft = bottomLeft) is needed to
-// bring it to top-left where it can touch your existing PA_1.
-const LESSON_CARD: Card = {
   topLeft: 'EMPTY',
-  topRight: 'EMPTY',
-  bottomLeft: 'PA_2',
-  bottomRight: 'COINS_2',
+  topRight: 'PD_1',
+  bottomLeft: 'MD_1',
+  bottomRight: 'MA_1',
   rotation: 'DEG_0',
 };
 
-// Two coins — out of reach this turn on 3 coins minus the 1 spent on slot B.
+// The card the lesson is built around: a real NORMAL-shape card (CardFactory: one +1
+// corner of every stat category). PA_1 sits bottom-right, so exactly one clockwise
+// rotation (rotateCornersOnce sets bottomLeft = bottomRight) brings it to bottom-left —
+// the corner that lands on your board's dead-weight MA_1 tile at (1,1), so the new
+// attack corner ends up beside your existing PA_1s without disturbing either of them.
+// The other three corners are real stat corners too, but they land on fresh board
+// cells with no matching neighbour, so only the attack corner counts once placed.
+const LESSON_CARD: Card = {
+  topLeft: 'MD_1',
+  topRight: 'MA_1',
+  bottomLeft: 'PD_1',
+  bottomRight: 'PA_1',
+  rotation: 'DEG_0',
+};
+
+// Two coins — out of reach this turn on 3 coins minus the 1 spent on slot B. A real
+// DOUBLE(MA)-shape card.
 const MARKET_C: Card = {
   topLeft: 'MA_2',
-  topRight: 'EMPTY',
-  bottomLeft: 'EMPTY',
-  bottomRight: 'MA_1',
+  topRight: 'PA_1',
+  bottomLeft: 'PD_1',
+  bottomRight: 'MD_1',
   rotation: 'DEG_0',
 };
 
 /** LESSON_CARD after one clockwise turn, as the store will compute it from CARD_ROTATED. */
 const LESSON_CARD_ROTATED: Card = {
-  topLeft: 'PA_2',
-  topRight: 'EMPTY',
-  bottomLeft: 'COINS_2',
-  bottomRight: 'EMPTY',
+  topLeft: 'PD_1',
+  topRight: 'MD_1',
+  bottomLeft: 'PA_1',
+  bottomRight: 'MA_1',
   rotation: 'DEG_90',
 };
 
@@ -205,7 +216,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'pick',
     title: 'Pick a card',
-    text: 'The market charges by position: the card furthest from the deck is free, the next costs 1 coin, the closest costs 2. The free card is all defense and does nothing for you here. Spend 1 of your 3 coins on the second card — it carries a 2 physical attack corner.',
+    text: 'The market charges by position: the card furthest from the deck is free, the next costs 1 coin, the closest costs 2. The free card has no physical attack corner, so it can\'t help you finish Gorn this turn. Spend 1 of your 3 coins on the second card — it carries a physical attack corner.',
     interactive: [SEL.marketSlotB],
     expect: { kind: 'pick', slot: 'B' },
     emit: [
@@ -233,7 +244,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'rotate',
     title: 'Rotate it',
-    text: 'The 2 physical attack corner is on the bottom-left, but it needs to be top-left to end up touching the attack corner already on your board. Rotate the card once.',
+    text: 'The physical attack corner is on the bottom-right, but it needs to be bottom-left to land beside the attack corner already on your board. Rotate the card once.',
     interactive: [SEL.rotateButton],
     expect: { kind: 'rotate' },
     emit: [{ msg: { type: 'CARD_ROTATED', playerId: YOU, rotation: 'DEG_90' } }],
@@ -242,7 +253,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'adjacency',
     title: 'Why adjacency matters',
-    text: 'This is the whole game: a corner only counts if it touches a matching corner up, down, left or right. Your two attack corners touch, so you have 2 physical attack. The coins corner beside them touches nothing of its own kind — it still gives coins, but stats need neighbours.',
+    text: 'This is the whole game: a corner only counts if it touches a matching corner up, down, left or right. Your two attack corners touch, so you have 2 physical attack. The coins corner and the magic attack corner beside them both touch nothing of their own kind — coins still count regardless, but the magic attack doesn\'t. That magic attack corner is dead weight; it\'s the one worth overwriting.',
     interactive: [],
     expect: { kind: 'advance' },
     dock: 'top',
@@ -251,16 +262,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'place',
     title: 'Place the card',
-    text: 'Grab the card by its top-left corner and drop it on the highlighted square. A new card must always overlap cards already on your board — this one covers your 1 attack corner and replaces it with the 2.',
+    text: 'Grab the card by its attack corner (bottom-left) and drop it on the highlighted square — your dead-weight magic attack corner. A new card must always overlap a tile already on your board, and overwriting that one costs you nothing: both of your existing attack corners stay exactly as they are, and the new one lands right next to them.',
     interactive: [SEL.heldCard, SEL.board],
     pointAt: [SEL.targetCell],
-    expect: { kind: 'place', corner: 'TOP_LEFT', x: 1, y: 1 },
+    expect: { kind: 'place', corner: 'BOTTOM_LEFT', x: 1, y: 1 },
     emit: [
       {
         msg: {
           type: 'CARD_PLACED',
           playerId: YOU,
-          corner: 'TOP_LEFT',
+          corner: 'BOTTOM_LEFT',
           x: 1,
           y: 1,
           card: LESSON_CARD_ROTATED,
@@ -270,8 +281,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         msg: {
           type: 'STATS_UPDATED',
           playerId: YOU,
-          // pa 1 + pa 2 now adjacent -> 3. Coins are unchanged: the card's own coins
-          // corner lands on top of the coins corner already there, so nothing is gained.
+          // 1 (0,0) + 1 (1,0) + 1 (1,1, new, replacing the dead MA_1) now mutually adjacent
+          // -> 3. The card's other three corners (MA_1/PD_1/MD_1) land on fresh cells that
+          // touch nothing of their own kind, so they contribute nothing this round — only
+          // the attack corner counts.
           stats: { hp: 24, pa: 3, pd: 0, ma: 0, md: 0, cn: 2, hpp: 0 },
         },
       },
@@ -282,7 +295,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'stats',
     title: '3 physical attack',
-    text: 'Your 1 attack corner now sits next to the 2 attack corner, so they add up: 3 physical attack. Gorn has 3 health and no physical defense at all.',
+    text: 'Both of your original attack corners are still on the board, untouched, and the new one you placed sits right beside them: 1 + 1 + 1 = 3 physical attack. Gorn has 3 health and no physical defense at all — left in your hand, that card would only have gotten you to 2 attack, and Gorn survives on 1 health. Placing it there, without wasting anything you already had, is what wins this.',
     interactive: [],
     expect: { kind: 'advance' },
     emit: [],

@@ -19,15 +19,21 @@ function TutorialBody({ onExit, driver }: { onExit: () => void; driver: Tutorial
   const boardSize = useOnlineStore((s) => Object.values(s.boards).flat().length);
   const holding = useOnlineStore((s) => s.heldCard !== null);
   const phase = useOnlineStore((s) => s.phase);
+  // Match's kill-animation overlay outlives the store's own phase/MATCH_RESULT bookkeeping
+  // (see the comment on Match's onBattleAnimating prop), so the coach box — including the
+  // "You win" step — needs this separate signal to avoid declaring victory while the
+  // animation the player is watching is still mid-fight.
+  const [battleAnimating, setBattleAnimating] = useState(false);
 
   return (
     <>
-      <Match onExit={onExit} pauseTimer />
+      <Match onExit={onExit} pauseTimer onBattleAnimating={setBattleAnimating} />
       <TutorialOverlay
         view={view}
         domRevision={`${boardSize}:${holding}:${phase}`}
         onNext={() => driver.next()}
         onExit={onExit}
+        hideCoach={battleAnimating}
       />
     </>
   );
