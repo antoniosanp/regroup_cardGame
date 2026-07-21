@@ -6,8 +6,8 @@ services:
     environment:
       # e.g. "-Xmx256m" on a memory-constrained VM (free-tier e2-micro is 1GB).
       JAVA_OPTS: ${BACKEND_JAVA_OPTS:-}
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
 
   frontend:
     build:
@@ -20,5 +20,25 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    expose:
+      - "80"
+
+  # TLS-terminating edge proxy: gets a Let's Encrypt cert for the DuckDNS
+  # domain and auto-renews it. Only this container is reachable from the
+  # internet; backend/frontend are internal-only (see `expose` above).
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

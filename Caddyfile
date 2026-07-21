@@ -1,0 +1,7 @@
+{
+	email antonio.pulgarin97@gmail.com
+}
+
+regroupchickenantoniosanp.duckdns.org {
+	reverse_proxy frontend:80
+}
