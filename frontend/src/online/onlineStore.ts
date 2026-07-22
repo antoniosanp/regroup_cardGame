@@ -136,6 +136,17 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
   let lastAction: 'pick' | 'place' | 'rotate' | null = null;
 
   const store = createStore<OnlineState>((set, get) => {
+    // Safety net for the pick/place optimistic lock: normally CARD_PICKED, CARD_PLACED,
+    // ERROR, TURN_START or ROUND_START clears `busy`. If a WS frame is ever dropped or
+    // arrives out of order, none of those fire and the lock never releases — every future
+    // pick/place attempt (including the free deck pick) then silently no-ops forever. This
+    // forces the lock open after a timeout so the player can always retry.
+    function armBusyFailsafe(): void {
+      setTimeout(() => {
+        if (get().busy) set({ busy: false });
+      }, 8000);
+    }
+
     function handlePrivate(raw: unknown): void {
       const msg = parsePrivateMessage(raw);
       if (!msg) return;
@@ -436,6 +447,7 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
         lastAction = 'pick';
         set({ busy: true });
         socket?.publish(`/app/match.${s.matchId}.pick`, { slot });
+        armBusyFailsafe();
       },
 
       rotate: () => {
@@ -451,6 +463,7 @@ export function createOnlineStore(socketFactory: GameSocketFactory) {
         lastAction = 'place';
         set({ busy: true });
         socket?.publish(`/app/match.${s.matchId}.place`, { corner, x, y });
+        armBusyFailsafe();
       },
 
       dismissError: () => set({ error: null }),

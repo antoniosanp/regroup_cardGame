@@ -339,7 +339,13 @@ public class MatchService {
             try {
                 card = engine.pickFromDeck(seat);
             } catch (InvalidMoveException e) {
-                log.warn("Match {} seat {} turn timed out with no card left to auto-play", match.matchId(), seat);
+                // Deck exhausted right when the timer fired: this seat truly has nothing to
+                // auto-play with. Re-arm the timeout instead of leaving the match with no
+                // scheduled work at all — without this the match stalls forever, since
+                // scheduleTurnTimeout is only ever called from armTurn(), which a skipped
+                // turn never reaches.
+                log.warn("Match {} seat {} turn timed out with no card left to auto-play; retrying", match.matchId(), seat);
+                scheduleTurnTimeout(match);
                 return;
             }
             broadcast(match, new Messages.CardPicked(playerId, "DECK", cardDto(card),
@@ -351,7 +357,10 @@ public class MatchService {
             try {
                 result = engine.place(seat, CornerPosition.TOP_LEFT, at.x, at.y);
             } catch (InvalidMoveException e) {
-                log.warn("Match {} seat {} auto-play placement failed: {}", match.matchId(), seat, e.getMessage());
+                // Same reasoning as above: an auto-play placement failure must not leave the
+                // match without any scheduled timeout.
+                log.warn("Match {} seat {} auto-play placement failed: {}; retrying", match.matchId(), seat, e.getMessage());
+                scheduleTurnTimeout(match);
                 return;
             }
             broadcast(match, new Messages.CardPlaced(
