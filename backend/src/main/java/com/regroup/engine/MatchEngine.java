@@ -104,12 +104,12 @@ public class MatchEngine {
         requireTurn(seat);
         requireCardHeld();
         Card placed = heldCard;
+        heldCard = null;
         try {
             boardEngine.placeCard(players.get(seat).board(), placed, overlapCorner, new Point(x, y));
         } catch (IllegalArgumentException e) {
             throw new InvalidMoveException(InvalidMoveException.Code.INVALID_PLACEMENT, e.getMessage());
         }
-        heldCard = null;
         combatEngine.calculateStats(players.get(seat).board(), players.get(seat));
         placedThisRound[seat] = true;
 

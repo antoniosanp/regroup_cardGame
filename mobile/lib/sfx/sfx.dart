@@ -48,23 +48,14 @@ enum SfxName {
   const SfxName(this.file);
 }
 
-/// Volume tiers from SOUNDS.md: quiet UI ticks ≈ 0.3, gameplay ≈ 0.6,
-/// stingers ≈ 0.9. Levels in the files are already pre-normalised to these
-/// tiers, so these multipliers apply on top.
-const double _tickVol = 0.35;
-const double _gameVol = 0.6;
-const double _stingVol = 0.9;
-const double _musicVol = 0.4;
-
-double _volumeFor(SfxName name) => switch (name) {
-  SfxName.timerLowTick || SfxName.hpTick || SfxName.cardHoverCell => _tickVol,
-  SfxName.matchFound ||
-  SfxName.victory ||
-  SfxName.defeat ||
-  SfxName.eliminated ||
-  SfxName.turnYours => _stingVol,
-  _ => _gameVol,
-};
+// SOUNDS.md's "Implementation notes" section describes aspirational tick/game/
+// stinger volume multipliers, but the shipped assets (byte-identical to the
+// web client's frontend/src/sfx/*.mp3 — see "Asset status") are already
+// pre-normalised to those tiers, and the web's playSfx.ts/playMusic() never
+// applies any further per-call volume scaling (both just play the decoded
+// file at its native level). This player intentionally does the same — do
+// not reintroduce a tier multiplier here, it would double-attenuate relative
+// to web and make mobile audibly quieter/differently balanced for no reason.
 
 const String _mutedPrefsKey = 'regroup.sfx.muted';
 
@@ -116,10 +107,7 @@ class Sfx {
     () async {
       try {
         await player.setReleaseMode(ReleaseMode.release);
-        await player.play(
-          AssetSource('sfx/${name.file}.mp3'),
-          volume: _volumeFor(name),
-        );
+        await player.play(AssetSource('sfx/${name.file}.mp3'));
         if (pitchVariance != null) {
           final rate = 1 + (_random.nextDouble() * 2 - 1) * pitchVariance;
           await player.setPlaybackRate(rate);
@@ -140,7 +128,7 @@ class Sfx {
     _music = player;
     try {
       await player.setReleaseMode(ReleaseMode.loop);
-      await player.play(AssetSource('sfx/music-lobby.mp3'), volume: _musicVol);
+      await player.play(AssetSource('sfx/music-lobby.mp3'));
     } catch (_) {
       await player.dispose();
       _music = null;

@@ -75,6 +75,7 @@ class GameNotifier extends StateNotifier<GameState> {
       _connect(identity);
     } catch (e) {
       await api.clearIdentity();
+      playSfx(SfxName.uiError);
       state = state.copyWith(
         conn: ConnStatus.failed,
         error: GameError(code: 'REGISTER_FAILED', message: '$e'),
