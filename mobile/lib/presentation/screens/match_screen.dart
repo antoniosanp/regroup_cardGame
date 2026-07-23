@@ -22,15 +22,32 @@ import '../widgets/turn_timer.dart';
 
 /// Square size of the two top-corner boxes (turn timer, opponent button).
 /// The web uses 180px; scaled well down here so the board keeps most of a
-/// short phone-landscape height.
+/// short phone-landscape height. Fixed and never stretched by a sibling, so
+/// the timer is always exactly this size regardless of player count/market
+/// content.
 const double _topBox = 66;
 
-/// Market band height — a bit taller than the corner squares so the market
-/// cards are more visible (per feedback), while the corner squares stay small.
-const double _marketHeight = 92;
+/// Market band height — taller than the corner squares so the market cards
+/// can be as big as possible (per feedback), while the corner squares stay
+/// small.
+const double _marketHeight = 104;
 
-/// Fixed height of the bottom HUD bar (web: 176px), scaled for phone.
-const double _bottomBarHeight = 96;
+/// Fixed cap on the player-order strip below the opponent-board button. A
+/// FittedBox inside this band scales the strip down if it doesn't fit,
+/// instead of letting it silently grow the whole top row taller — with 3-4
+/// players the row used to wrap onto two lines here (only ~90px of width was
+/// given to up to 4 avatars, which need ~150px on one line) and that alone
+/// was inflating the entire top band well past _marketHeight, stealing most
+/// of the board's vertical space. Widening the row below fixes the common
+/// case (avatars fit on one line); this cap is the guard rail for anything
+/// that still doesn't fit.
+const double _orderRowHeight = 34;
+
+/// Width of the player-HUD and hand-panel columns flanking the board (same
+/// value for both, so they read as symmetric) — the old bottom bar is gone
+/// (feedback: freeing up the whole bottom bar for just the board gives it
+/// noticeably more room than sharing that bar with the hand ever did).
+const double _handColumnWidth = 132;
 
 void _noOpPick(Slot slot) {}
 void _noOp() {}
@@ -141,11 +158,17 @@ class _MatchScreenState extends State<MatchScreen> {
               // Market band flush to the top (feedback).
               _matchTop(context, currentName, isYourTurn),
               const SizedBox(height: 2),
-              Expanded(child: _boardZone()),
-              const SizedBox(height: 2),
-              _statusLine(currentName, isYourTurn),
-              // Bottom HUD flush to the bottom (feedback) — no trailing gap.
-              SizedBox(height: _bottomBarHeight, child: _matchBottom(self)),
+              // The status line ("Round X · Turn phase · Waiting for...")
+              // was removed entirely (feedback: it was oversized, centered,
+              // and redundant — the timer box already shows whose turn it
+              // is). Its mute/leave controls now live under the timer in
+              // _matchTop. The player HUD and hand panel also no longer get
+              // their own bottom bar (feedback: that bar was stealing height
+              // from the board, which was wider than tall as a result) —
+              // both now live *inside* the board zone's own row, left and
+              // right of the board, so the board's height is whatever's left
+              // after the top band, full stop.
+              Expanded(child: _boardZone(self)),
             ],
           ),
         ),
@@ -160,16 +183,55 @@ class _MatchScreenState extends State<MatchScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: _topBox,
-          height: _topBox,
-          child: TurnTimer(
-            phase: widget.phase,
-            round: widget.round,
-            currentSeat: widget.currentSeat,
-            currentName: currentName,
-            isYourTurn: isYourTurn,
-          ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: _topBox,
+              height: _topBox,
+              child: TurnTimer(
+                phase: widget.phase,
+                round: widget.round,
+                currentSeat: widget.currentSeat,
+                currentName: currentName,
+                isYourTurn: isYourTurn,
+              ),
+            ),
+            const SizedBox(height: 3),
+            // Mute + Leave now live under the timer (feedback) — they used
+            // to sit in the hand panel, which has since moved to the side of
+            // the board and no longer has a natural corner for them.
+            SizedBox(
+              width: _topBox,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const MuteButton(size: 16),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        playSfx(SfxName.uiClick);
+                        widget.onLeave();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textLight,
+                        backgroundColor: const Color(0x8C140A05),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Leave', style: TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(width: 6),
         Expanded(
@@ -196,14 +258,22 @@ class _MatchScreenState extends State<MatchScreen> {
               child: _opponentButton(context),
             ),
             const SizedBox(height: 3),
+            // Wide enough for 4 avatars (32px each + 6px spacing) on a
+            // single line, with a fixed height cap so a longer line still
+            // can't grow the whole top band — see _orderRowHeight's doc.
             SizedBox(
-              width: _topBox + 24,
-              child: PlayerOrderRow(
-                players: widget.players,
-                currentSeat: widget.currentSeat,
-                startingSeat: widget.startingSeat,
-                phase: widget.phase,
-                selfId: widget.selfId,
+              width: _topBox + 90,
+              height: _orderRowHeight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.topCenter,
+                child: PlayerOrderRow(
+                  players: widget.players,
+                  currentSeat: widget.currentSeat,
+                  startingSeat: widget.startingSeat,
+                  phase: widget.phase,
+                  selfId: widget.selfId,
+                ),
               ),
             ),
           ],
@@ -243,12 +313,29 @@ class _MatchScreenState extends State<MatchScreen> {
     );
   }
 
-  // ---- board-zone: pole | board (mainBoard bg) | pole ----
-  Widget _boardZone() {
+  // ---- board-zone: pole | player HUD | board (mainBoard bg) | hand panel |
+  // pole ----
+  // The player HUD and hand panel are symmetric side columns (same
+  // _handColumnWidth) inside this same Expanded row, not a separate bottom
+  // bar — feedback: a separate bar for them left the board wider than tall,
+  // when giving the board this whole zone's height (not just its width)
+  // was the point of moving the hand panel over in the first place.
+  Widget _boardZone(PlayerState? self) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _BorderPole(asset: BoardArt.borderPole1),
+        if (self != null)
+          SizedBox(
+            width: _handColumnWidth,
+            child: Center(
+              child: PlayerHud(
+                seat: self.seat,
+                name: self.name,
+                stats: self.stats,
+              ),
+            ),
+          ),
         Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -276,86 +363,13 @@ class _MatchScreenState extends State<MatchScreen> {
             ),
           ),
         ),
+        SizedBox(width: _handColumnWidth, child: _handPanel()),
         const _BorderPole(asset: BoardArt.borderPole2),
       ],
     );
   }
 
-  // ---- thin status line ----
-  Widget _statusLine(String? currentName, bool isYourTurn) {
-    final held = widget.heldBy == widget.selfId && widget.heldCard != null;
-    final indicator = widget.phase == Phase.battle
-        ? 'Resolving battle…'
-        : isYourTurn
-        ? (held
-              ? 'Rotate, then drag your card onto the board'
-              : 'Your turn — pick a card')
-        : 'Waiting for ${currentName ?? 'the current player'}…';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0x8C3C2614),
-        border: Border.all(color: AppColors.wood),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'Round ${widget.round} · ${widget.phase == Phase.battle ? 'Battle' : 'Turn'}'
-            '${widget.finalRound ? ' · Final round' : ''}',
-            style: const TextStyle(
-              color: AppColors.textLight,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              indicator,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.gold,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const MuteButton(size: 18),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () {
-              playSfx(SfxName.uiClick);
-              widget.onLeave();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.textLight,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text('Leave', style: TextStyle(fontSize: 12)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---- match-bottom: player HUD | hand slot ----
-  Widget _matchBottom(PlayerState? self) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (self != null)
-          PlayerHud(seat: self.seat, name: self.name, stats: self.stats),
-        const SizedBox(width: 8),
-        Expanded(child: _handSlot()),
-      ],
-    );
-  }
-
-  Widget _handSlot() {
+  Widget _handPanel() {
     final held = widget.heldBy == widget.selfId ? widget.heldCard : null;
     Widget content;
     if (_pendingPlacement != null) {
@@ -371,6 +385,7 @@ class _MatchScreenState extends State<MatchScreen> {
     }
 
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
         color: const Color(0x663C2614),
         border: Border.all(color: AppColors.wood, width: 2),
@@ -412,9 +427,10 @@ class _BorderPole extends StatelessWidget {
   }
 }
 
-/// The held card in the hand slot: draggable card + Rotate button + hint,
-/// laid out in a row so it fits the fixed-height bottom bar. Mirrors the
-/// web's `.held-card`.
+/// The held card in the hand panel: draggable card + Rotate button + hint,
+/// stacked in a column now that the panel lives beside the board (narrow but
+/// tall) rather than in a wide, short bottom bar. Mirrors the web's
+/// `.held-card` in spirit, not literal layout.
 class _HeldCard extends StatelessWidget {
   final domain.Card card;
   final VoidCallback onRotate;
@@ -423,44 +439,42 @@ class _HeldCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A finite card size is required: DraggableHeldCard's drag feedback is an
-    // unconstrained overlay, so it can't take an infinite size. Sized to fit
-    // the fixed-height bottom bar.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardSize = (constraints.maxHeight - 16).clamp(40.0, 84.0);
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              DraggableHeldCard(card: card, size: cardSize),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: () {
-                  playSfx(SfxName.cardRotate);
-                  onRotate();
-                },
-                icon: const Icon(Icons.rotate_right, size: 18),
-                label: const Text('Rotate'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Flexible(
-                child: Text(
-                  'Drag the card onto your board to place it.',
-                  style: TextStyle(color: AppColors.textLight, fontSize: 12),
-                ),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // A finite card size is required: DraggableHeldCard's drag
+          // feedback is an unconstrained overlay, so it can't take an
+          // infinite size. The panel's own width is the limiting dimension
+          // here (not height, since it's now generous).
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardSize = constraints.maxWidth.clamp(40.0, 96.0);
+              return DraggableHeldCard(card: card, size: cardSize);
+            },
           ),
-        );
-      },
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () {
+              playSfx(SfxName.cardRotate);
+              onRotate();
+            },
+            icon: const Icon(Icons.rotate_right, size: 16),
+            label: const Text('Rotate'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Drag onto your board to place it.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textLight, fontSize: 11),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -470,23 +484,24 @@ class _EmptyHand extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: 0.5,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          const Center(
-            child: Image(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Image(
               image: AssetImage(BoardArt.cardBack),
-              fit: BoxFit.fitHeight,
+              width: 72,
+              fit: BoxFit.contain,
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(6),
-            child: Text(
+            const SizedBox(height: 8),
+            const Text(
               'Empty hand',
               style: TextStyle(color: AppColors.textLight, fontSize: 12),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -141,28 +141,20 @@ class _MarketSlot extends StatelessWidget {
     final enabled = canPick && card != null && affordable;
     final priceText = price == 0 ? 'Free' : '$price';
 
-    // Card on top, price floating BELOW it (feedback) so the badge never
-    // covers a card corner.
     return _TapSlot(
       enabled: enabled,
       onTap: onPick,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: card != null
-                ? CardView(card: card!, size: double.infinity)
-                : const EmptyCard(label: '—', size: double.infinity),
-          ),
-          if (card != null) ...[
-            const SizedBox(height: 2),
-            _CostBadge(
-              text: priceText,
-              blocked: canPick && !affordable,
-              free: price == 0,
-            ),
-          ],
-        ],
+      child: _SquareCardWithBadge(
+        card: card != null
+            ? CardView(card: card!, size: double.infinity)
+            : const EmptyCard(label: '—', size: double.infinity),
+        badge: card != null
+            ? _CostBadge(
+                text: priceText,
+                blocked: canPick && !affordable,
+                free: price == 0,
+              )
+            : null,
       ),
     );
   }
@@ -185,30 +177,63 @@ class _DeckSlot extends StatelessWidget {
     return _TapSlot(
       enabled: enabled,
       onTap: onPick,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.asset(BoardArt.cardBack, fit: BoxFit.contain),
-                Text(
-                  '$deckRemaining',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: AppColors.textLight,
-                    shadows: [Shadow(color: Colors.black, blurRadius: 3)],
-                  ),
-                ),
-              ],
+      child: _SquareCardWithBadge(
+        card: Stack(
+          alignment: Alignment.center,
+          children: [
+            Image.asset(BoardArt.cardBack, fit: BoxFit.contain),
+            Text(
+              '$deckRemaining',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: AppColors.textLight,
+                shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          const _CostBadge(text: 'Free', blocked: false, free: true),
-        ],
+          ],
+        ),
+        badge: const _CostBadge(text: 'Free', blocked: false, free: true),
       ),
+    );
+  }
+}
+
+/// Lays out a square card filling nearly the whole available box — sized to
+/// the slot's own window in marketFrame.png, which is close to square, so
+/// the card (unlike a Column-based layout that used to squash it into a
+/// short rectangle) fills almost all of it and its 2x2 attribute icons stay
+/// clearly readable. [badge] is a small price/free chip pinned to the
+/// bottom-right corner, overlapping only that one corner rather than a full
+/// strip across the card — a `Stack` sizes itself to its *non-positioned*
+/// children only, so without the explicit `SizedBox(height/width: full
+/// slot)` here the whole thing used to shrink to the card's own size and the
+/// "bottom" badge ended up overlapping the card instead of sitting past its
+/// edge.
+class _SquareCardWithBadge extends StatelessWidget {
+  final Widget card;
+  final Widget? badge;
+
+  const _SquareCardWithBadge({required this.card, this.badge});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AspectRatio(aspectRatio: 1, child: card),
+              if (badge != null)
+                Positioned(bottom: -4, right: -4, child: badge!),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -261,24 +286,27 @@ class _CostBadge extends StatelessWidget {
         : free
         ? AppColors.good
         : AppColors.wood;
+    // A small corner chip now (pinned over the card's bottom-right corner),
+    // not a full-width strip — kept compact so it only covers that one
+    // corner instead of a broad band across the card.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
         border: Border.all(color: AppColors.gold, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!free) ...[
-            Image.asset(BoardArt.coin, width: 11, height: 11),
+            Image.asset(BoardArt.coin, width: 9, height: 9),
             const SizedBox(width: 2),
           ],
           Text(
             text,
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: FontWeight.w800,
               color: AppColors.textLight,
             ),

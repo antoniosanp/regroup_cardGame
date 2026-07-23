@@ -30,30 +30,57 @@ class ActionButtons extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        OutlinedButton.icon(
-          onPressed: confirming ? null : onCancel,
-          icon: const Icon(Icons.close),
-          label: const Text('Cancel'),
-        ),
-        const SizedBox(width: 16),
-        FilledButton.icon(
-          onPressed: confirming ? null : onConfirm,
-          icon: confirming
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Icon(Icons.check),
-          label: Text(confirming ? 'Confirming…' : 'Confirm'),
-        ),
-      ],
+    // Stacked, not side-by-side — this only renders inside the narrow hand
+    // panel beside the board now, where a Row of two icon+label buttons
+    // wouldn't fit. No icons either, and an explicit compact style: the
+    // default FilledButton.icon/OutlinedButton.icon sizing (icon + label +
+    // Material's default padding/min-tap-target) was wider than the ~116px
+    // this panel actually has, so "Confirm" was wrapping onto a second line
+    // and the button was spilling past the panel's edge.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: confirming ? null : onConfirm,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(fontSize: 13),
+              ),
+              child: confirming
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Confirm'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: confirming ? null : onCancel,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(fontSize: 13),
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

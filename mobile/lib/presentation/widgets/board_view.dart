@@ -3,10 +3,16 @@ import 'package:flutter/material.dart';
 import '../../domain/models/board_point.dart';
 import '../assets/corner_art.dart';
 
-/// Size of one lattice cell, in logical pixels. Bumped toward the web's 56px
-/// look; BoardDropTarget shares this same constant for hit-testing, so
-/// changing it keeps placement coordinates correct.
-const double boardCellSize = 40;
+/// Size of one lattice cell, in logical pixels — matches the web's own
+/// `.board-cell` (56×56px) so a board with only a couple of cards on it
+/// doesn't render as a postage stamp lost in the middle of the wood panel.
+/// `BoardDropTarget`'s enclosing `FittedBox(fit: BoxFit.scaleDown)` is what
+/// keeps a large board from overflowing — it only shrinks cells below this
+/// size when the played-card cluster actually needs more room than is
+/// available, it never enlarges them. BoardDropTarget shares this same
+/// constant for hit-testing, so changing it keeps placement coordinates
+/// correct.
+const double boardCellSize = 56;
 
 class BoardBounds {
   final int minX;

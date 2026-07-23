@@ -172,9 +172,29 @@ class _TurnTimerState extends State<TurnTimer>
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 12,
+                      // Web's .turn-timer-yours .turn-timer-label: bigger,
+                      // bold, gold with a glow — falling back to red (not
+                      // gold) once the low-timer pulse kicks in, matching
+                      // `.turn-timer-yours.turn-timer-low .turn-timer-label`.
+                      fontSize: yours ? 15 : 12,
                       fontWeight: yours ? FontWeight.w800 : FontWeight.w600,
-                      color: yours ? AppColors.wood : AppColors.text,
+                      color: yours
+                          ? (low ? AppColors.bad : AppColors.gold)
+                          : AppColors.text,
+                      shadows: yours
+                          ? [
+                              Shadow(
+                                color: (low ? AppColors.bad : AppColors.gold)
+                                    .withValues(alpha: 0.9),
+                                blurRadius: 6,
+                              ),
+                              const Shadow(
+                                color: Color(0x99000000),
+                                offset: Offset(0, 1),
+                                blurRadius: 2,
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
                 ],

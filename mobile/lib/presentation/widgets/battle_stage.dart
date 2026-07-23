@@ -292,89 +292,103 @@ class _BattleStageState extends State<BattleStage>
 
     return Positioned.fill(
       child: Container(
-        color: Colors.black87,
+        // Matches the web's dark wood-brown scrim (rgba(15,9,5,.94)) rather
+        // than a plain black overlay.
+        color: const Color(0xF00F0905),
         padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Text(
-              'Battle — round ${widget.battle.round}',
-              style: const TextStyle(
-                color: AppColors.textLight,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Attacker card (left), lunging toward the target on each hit.
-                  SizedBox(
-                    width: 132,
-                    child: Center(
-                      child: AnimatedBuilder(
-                        animation: _lungeController,
-                        builder: (context, child) => Transform.translate(
-                          offset: _lungeOffset * _lungeController.value,
-                          child: child,
-                        ),
-                        child: _AttackerCard(
-                          key: _attackerKey,
-                          attacker: attacker,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Defenders: square cards, wrapped so they flow if needed.
-                  Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          runAlignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: ordered.map((p) {
-                            return _DefenderCard(
-                              key: _keyFor(p.playerId),
-                              player: p,
-                              isAttacking: p.playerId == _activeAttackerId,
-                              isHit: p.playerId == _highlightDefenderId,
-                              isDead: _deadIds.contains(p.playerId),
-                              isSelf: p.playerId == widget.selfId,
-                              hp: _shownHp[p.playerId] ?? p.stats.hp,
-                              floaters: _floaters
-                                  .where((f) => f.playerId == p.playerId)
-                                  .toList(),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (!_finished && widget.battle.attacks.isNotEmpty)
-              TextButton(
-                onPressed: () {
-                  playSfx(SfxName.battleSkip);
-                  _skipped = true;
-                  _finishInstantly();
-                },
-                child: const Text(
-                  'Skip animation',
-                  style: TextStyle(color: AppColors.textLight, fontSize: 12),
+        // Forces every Text in this overlay to render without a decoration
+        // (feedback: names/numbers were showing a stray underline during the
+        // battle phase). No TextStyle in this file — or anywhere else in the
+        // app — sets an underline explicitly, so this is a defensive reset
+        // in case it's being inherited from somewhere upstream.
+        child: DefaultTextStyle.merge(
+          style: const TextStyle(decoration: TextDecoration.none),
+          child: Column(
+            children: [
+              Text(
+                'Battle — round ${widget.battle.round}',
+                style: const TextStyle(
+                  color: AppColors.textLight,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            if (_finished)
-              const Text(
-                'Next round…',
-                style: TextStyle(color: AppColors.muted, fontSize: 11),
+              const SizedBox(height: 6),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Attacker card (left), lunging toward the target on each hit.
+                    SizedBox(
+                      width: 132,
+                      child: Center(
+                        child: AnimatedBuilder(
+                          animation: _lungeController,
+                          builder: (context, child) => Transform.translate(
+                            offset: _lungeOffset * _lungeController.value,
+                            child: child,
+                          ),
+                          child: _AttackerCard(
+                            key: _attackerKey,
+                            attacker: attacker,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Defenders: a fixed vertical column, one row per player —
+                    // mirrors the web's `.battle-defenders` (a stable per-player
+                    // slot that never reflows), not a row/Wrap. Scrollable so
+                    // 4 tall cards on a short landscape screen never overflow.
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final p in ordered) ...[
+                                _DefenderCard(
+                                  key: _keyFor(p.playerId),
+                                  player: p,
+                                  isAttacking: p.playerId == _activeAttackerId,
+                                  isHit: p.playerId == _highlightDefenderId,
+                                  isDead: _deadIds.contains(p.playerId),
+                                  isSelf: p.playerId == widget.selfId,
+                                  hp: _shownHp[p.playerId] ?? p.stats.hp,
+                                  floaters: _floaters
+                                      .where((f) => f.playerId == p.playerId)
+                                      .toList(),
+                                ),
+                                if (p != ordered.last)
+                                  const SizedBox(height: 8),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-          ],
+              if (!_finished && widget.battle.attacks.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    playSfx(SfxName.battleSkip);
+                    _skipped = true;
+                    _finishInstantly();
+                  },
+                  child: const Text(
+                    'Skip animation',
+                    style: TextStyle(color: AppColors.textLight, fontSize: 12),
+                  ),
+                ),
+              if (_finished)
+                const Text(
+                  'Next round…',
+                  style: TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -398,9 +412,15 @@ class _AttackerCard extends StatelessWidget {
         width: 118,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.iron,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.accent, width: a != null ? 2 : 1),
+          // Wood gradient + gold border, matching the web's
+          // .battle-attacker tile instead of a flat iron box.
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.woodLight, AppColors.woodDark],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gold, width: a != null ? 3 : 1),
         ),
         child: a == null
             ? const SizedBox(
@@ -415,9 +435,18 @@ class _AttackerCard extends StatelessWidget {
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundImage: AssetImage(avatarFor(a.seat)),
+                  // Squared, rounded-corner portrait (web uses
+                  // border-radius:10px, not a circle) — same pattern as
+                  // PlayerHud's portrait.
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.iron, width: 2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(avatarFor(a.seat), fit: BoxFit.cover),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -446,9 +475,13 @@ class _AttackerCard extends StatelessWidget {
   }
 }
 
-/// A defender, shown as a square-ish card: avatar + name on top, HP and the
-/// defensive stats (PD/MD) below. Flashes when hit, dims + skull when dead,
-/// gold border for you, wood border for the current attacker.
+/// A defender, shown as a wide-short card: avatar on the left, name/HP/PD/MD
+/// stacked to its *right* (not below it) — keeping stats beside the avatar
+/// instead of underneath is what keeps each row short, so a column of 4 of
+/// these never runs off a short landscape screen (feedback: the old
+/// everything-stacked-vertically layout could push the roster off-screen).
+/// Flashes when hit, dims + skull when dead, gold border for you, wood
+/// border for the current attacker.
 class _DefenderCard extends StatelessWidget {
   final PlayerState player;
   final bool isAttacking;
@@ -471,91 +504,159 @@ class _DefenderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A square, rounded-corner portrait (web's .battle-defender-avatar is
+    // border-radius:9px, not a circle) — desaturated when eliminated, same
+    // spirit as the web's grayscale(0.85) filter on dead rows. The skull for
+    // "dead" is a small badge pinned to its corner (same pattern as the
+    // first-mover badge in PlayerOrderRow) instead of its own text line
+    // below, since stats no longer have a "below the avatar" area to put it in.
+    Widget avatarImage = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppColors.iron, width: 2),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.asset(avatarFor(player.seat), fit: BoxFit.cover),
+    );
+    if (isDead) {
+      avatarImage = ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0, 0, 0, 1, 0,
+        ]),
+        child: avatarImage,
+      );
+    }
+    final avatar = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatarImage,
+        if (isDead)
+          const Positioned(
+            top: -4,
+            right: -4,
+            child: Text('💀', style: TextStyle(fontSize: 12)),
+          ),
+      ],
+    );
+
+    Widget card = AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 172,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      decoration: BoxDecoration(
+        color: isHit
+            ? AppColors.accent.withValues(alpha: 0.65)
+            : isAttacking
+            ? AppColors.wood.withValues(alpha: 0.4)
+            : AppColors.iron,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSelf ? AppColors.gold : AppColors.woodDark,
+          width: isSelf ? 2 : 1,
+        ),
+        // Red glow ring on the hit row, mirroring the web's
+        // `box-shadow: 0 0 0 2px var(--bad)` on .battle-row-hit.
+        boxShadow: isHit
+            ? [
+                BoxShadow(
+                  color: AppColors.bad.withValues(alpha: 0.8),
+                  blurRadius: 6,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Opacity(
+        opacity: isDead ? 0.4 : 1,
+        // Avatar on the left, everything else stacked *beside* it — keeping
+        // stats to the right instead of below is what keeps this row short.
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            avatar,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${player.name}${isSelf ? ' (you)' : ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textLight,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (isAttacking)
+                        const Text(
+                          'ATK',
+                          style: TextStyle(
+                            color: AppColors.warn,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(BoardArt.hp, width: 14, height: 14),
+                      const SizedBox(width: 3),
+                      AnimatedNumber(
+                        value: hp,
+                        style: TextStyle(
+                          color: hp <= 0 ? AppColors.bad : AppColors.textLight,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatChip(icon: BoardArt.pd, value: player.stats.pd),
+                      const SizedBox(width: 6),
+                      _StatChip(icon: BoardArt.md, value: player.stats.md),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (isAttacking) {
+      // Dashed outline, mirroring the web's `.battle-row-attacking`
+      // (border-style: dashed) marker on the current attacker's own roster
+      // entry — additive to whatever solid border/tint the card already has.
+      card = CustomPaint(
+        foregroundPainter: _DashedRRectPainter(
+          color: AppColors.gold,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: card,
+      );
+    }
+
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 96,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-          decoration: BoxDecoration(
-            color: isHit
-                ? AppColors.accent.withValues(alpha: 0.65)
-                : isAttacking
-                ? AppColors.wood.withValues(alpha: 0.4)
-                : AppColors.iron,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelf ? AppColors.gold : AppColors.woodDark,
-              width: isSelf ? 2 : 1,
-            ),
-          ),
-          child: Opacity(
-            opacity: isDead ? 0.4 : 1,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top: avatar + name.
-                CircleAvatar(
-                  radius: 22,
-                  backgroundImage: AssetImage(avatarFor(player.seat)),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${player.name}${isSelf ? ' (you)' : ''}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textLight,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Divider(height: 8, thickness: 1, color: Colors.white24),
-                // HP (prominent, animated).
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(BoardArt.hp, width: 15, height: 15),
-                    const SizedBox(width: 3),
-                    AnimatedNumber(
-                      value: hp,
-                      style: TextStyle(
-                        color: hp <= 0 ? AppColors.bad : AppColors.textLight,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                // Bottom: defensive stats (PD/MD).
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _StatChip(icon: BoardArt.pd, value: player.stats.pd),
-                    const SizedBox(width: 8),
-                    _StatChip(icon: BoardArt.md, value: player.stats.md),
-                  ],
-                ),
-                if (isDead)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Text('💀'),
-                  ),
-                if (isAttacking)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Text(
-                      'attacking',
-                      style: TextStyle(color: AppColors.warn, fontSize: 10),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
+        card,
         // Damage / heal floaters, rising and fading above the card.
         ...floaters.map(
           (f) => Positioned(
@@ -585,6 +686,41 @@ class _DefenderCard extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Lightweight dashed rounded-rect outline — no external package needed for
+/// this one polish detail (P2 in the mobile/web visual-parity plan).
+class _DashedRRectPainter extends CustomPainter {
+  final Color color;
+  final BorderRadius borderRadius;
+
+  const _DashedRRectPainter({required this.color, required this.borderRadius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = borderRadius.toRRect(Offset.zero & size);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    const dashWidth = 4.0;
+    const dashGap = 3.0;
+    for (final metric in (Path()..addRRect(rrect)).computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + dashWidth;
+        canvas.drawPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          paint,
+        );
+        distance = next + dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
 }
 
 class _StatChip extends StatelessWidget {

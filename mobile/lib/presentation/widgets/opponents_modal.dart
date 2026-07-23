@@ -125,18 +125,29 @@ class _OpponentsDialogState extends State<_OpponentsDialog> {
                 ),
                 const SizedBox(height: 8),
                 if (selected != null)
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          _OpponentStatRow(stats: selected.stats),
-                          const SizedBox(height: 8),
-                          BoardView(
-                            points:
-                                widget.boards[selected.playerId] ?? const [],
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _OpponentStatRow(stats: selected.stats),
+                        const SizedBox(height: 8),
+                        // Shrinks to fit instead of scrolling (feedback): a
+                        // FittedBox means every opponent's board — however
+                        // big — always occupies exactly this same amount of
+                        // space, so switching between opponents never
+                        // requires scrolling to see the whole thing.
+                        Expanded(
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: BoardView(
+                                points:
+                                    widget.boards[selected.playerId] ??
+                                    const [],
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
               ],

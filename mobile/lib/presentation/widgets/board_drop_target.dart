@@ -20,12 +20,15 @@ import 'board_view.dart';
 ///     coordinates (fx, fy), via the rendered lattice's own RenderBox — its
 ///     local origin (0,0) is always board point (minX, maxY) by construction
 ///     (see [BoardView]/[computeBoardBounds]).
-///  2. Find the nearest currently-occupied point to (fx, fy) — always, with
-///     NO distance gate. BoardEngine only allows anchoring on an
-///     already-occupied point, so the nearest such point is the only sensible
-///     target no matter where over the board the card is dropped; refusing to
-///     place unless the finger was within some radius is exactly what made
-///     "I can't place the next card" happen on a real device.
+///  2. Find the nearest currently-occupied point to (fx, fy). A candidate is
+///     only returned within [_snapRadius] cells of that point — feedback:
+///     predicting a landing spot from anywhere on the board made dragging
+///     feel like it was "grabbing" cells nowhere near the finger, which
+///     hurt positioning more than it helped. An earlier attempt at exactly
+///     this kind of gate is what caused "I can't place the next card" on a
+///     real device, but that was before the bounds-mirroring fix below
+///     existed — with the coordinate math now exact and cells a comfortable
+///     56px, a generous gate is safe again.
 ///  3. The quadrant of (fx, fy) relative to that anchor point decides which
 ///     of the new card's own corners gets anchored there (so the card visually
 ///     grows toward wherever the pointer/drag currently is): up-right of
@@ -48,6 +51,13 @@ import 'board_view.dart';
 /// is [pendingPreviewPoints], supplied by the caller (MatchScreen), which
 /// takes priority over whatever this widget is computing internally during
 /// an active drag.
+/// How close (in board-cell units) a drag needs to be to an existing point
+/// before a placement preview appears and a drop is accepted there — see the
+/// class doc's point 2. 1.5 is a bit more than one cell's diagonal (~1.41),
+/// so aiming at a cell adjacent to the target (not just the target itself)
+/// still snaps, while dragging from well across the board does not.
+const double _snapRadius = 1.5;
+
 class BoardDropTarget extends StatefulWidget {
   final List<BoardPoint> points;
   final List<BoardPoint>? pendingPreviewPoints;
@@ -97,13 +107,45 @@ class _BoardDropTargetState extends State<BoardDropTarget> {
         // Fill the whole board zone so the drop target covers all of it — not
         // just the small centered lattice. The lattice is centered inside for
         // display; hit-testing still uses its own RenderBox for coordinates.
+        //
+        // FittedBox(scaleDown) is the overflow guard for boards whose played
+        // cards outgrow the available board-zone space (the fixed-height top
+        // market band + bottom HUD bar leave a variable amount of room): it
+        // only shrinks the lattice (never enlarges it, never distorts it —
+        // BoxFit.scaleDown always preserves aspect ratio), so a small board
+        // still renders at native boardCellSize while a big one is scaled
+        // uniformly to fit instead of overflowing. This does NOT break drag
+        // coordinate math in [_computeCandidate]: RenderBox.globalToLocal
+        // walks the full transform chain (including FittedBox's scale
+        // matrix), so `local` below still comes back in the lattice's own
+        // pre-scale (boardCellSize-per-cell) coordinate space.
+        // The Padding below is what leaves room to build a "tower": once a
+        // tall stack has grown enough that FittedBox scales it to nearly
+        // fill this whole box, there's no space *inside this widget* left to
+        // drop a card "one row higher" — a drag past that point would have
+        // to cross into the market widget above, which has its own hit
+        // testing and never sees it, so the drop silently fails (reported:
+        // "no puedo colocar más arriba, ya está a la altura del market").
+        // Reserving a fixed margin here means the rendered (already
+        // scaled-down) lattice can never touch this container's own edges,
+        // so there's always genuine room, inside the SAME DragTarget, to
+        // aim a drag above the current top row.
         return SizedBox.expand(
           child: Center(
-            child: BoardView(
-              latticeKey: _latticeKey,
-              points: widget.points,
-              previewPoints:
-                  widget.pendingPreviewPoints ?? _candidate?.previewPoints,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 28,
+                horizontal: 16,
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: BoardView(
+                  latticeKey: _latticeKey,
+                  points: widget.points,
+                  previewPoints:
+                      widget.pendingPreviewPoints ?? _candidate?.previewPoints,
+                ),
+              ),
             ),
           ),
         );
@@ -126,7 +168,24 @@ class _BoardDropTargetState extends State<BoardDropTarget> {
   }
 
   _Candidate? _computeCandidate(Offset globalPosition, domain.Card card) {
-    final bounds = computeBoardBounds(widget.points);
+    // Must mirror BoardView's own bounds computation exactly (real points
+    // *plus* whatever preview is currently rendered), not just the real
+    // points. BoardView lays its lattice out from `bounds.maxY` down to
+    // `bounds.minY` — the moment a drag's preview extends past the real
+    // points (e.g. dragging a new card up against the topmost row), BoardView
+    // re-renders one or more rows taller/wider and [_latticeKey]'s local
+    // (0,0) origin shifts with it. Using real-points-only bounds here would
+    // then read `local` in the *old*, narrower coordinate system every
+    // subsequent pointer move of the same drag, silently offsetting fx/fy —
+    // worse the more rows a drag has already added on top of an existing
+    // stack. That mismatch was reported as "can't place cards further up
+    // once the board has grown a couple of cards toward the market."
+    final previewSoFar =
+        widget.pendingPreviewPoints ?? _candidate?.previewPoints;
+    final boundsSource = (previewSoFar != null && previewSoFar.isNotEmpty)
+        ? [...widget.points, ...previewSoFar]
+        : widget.points;
+    final bounds = computeBoardBounds(boundsSource);
 
     if (bounds == null) {
       // Empty board: BoardEngine.isValidPlacement allows any point here —
@@ -162,9 +221,11 @@ class _BoardDropTargetState extends State<BoardDropTarget> {
         nearest = p;
       }
     }
-    // No distance gate: the nearest occupied point is always the target (see
-    // the class doc — a gated radius is what blocked placing later cards).
-    if (nearest == null) return null;
+    // Gated: no candidate at all (no preview, no valid drop) unless the drag
+    // is actually near a real point — see the class doc's point 2.
+    if (nearest == null || nearestDistSq > _snapRadius * _snapRadius) {
+      return null;
+    }
 
     final dx = fx - nearest.x;
     final dy = fy - nearest.y;

@@ -8,9 +8,11 @@ import 'animated_number.dart';
 /// This player's portrait (avatar photo with a gold border and four corner
 /// badges: HP top-left, name top-right, potion bottom-left, coin
 /// bottom-right) plus a 2x2 stat grid (PA/MA over PD/MD). Mirrors the web
-/// client's PlayerHud.tsx + `.player-hud*`/`.stat-*` CSS. Designed to fill a
-/// fixed-height bottom bar: the portrait is aspect-ratio driven off the
-/// available height, the stat grid a fixed-width column beside it.
+/// client's PlayerHud.tsx + `.player-hud*`/`.stat-*` CSS. Stacked in a
+/// column — this now lives in a narrow panel beside the board (symmetric to
+/// the hand panel on the opposite side), not a wide bottom bar, so the
+/// portrait is width-driven (AspectRatio picks its own height) with the
+/// stat grid below it rather than beside it.
 class PlayerHud extends StatelessWidget {
   final int seat;
   final String name;
@@ -25,11 +27,12 @@ class PlayerHud extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _Portrait(seat: seat, name: name, stats: stats),
-        const SizedBox(width: 8),
+        const SizedBox(height: 8),
         _StatGrid(stats: stats),
       ],
     );
@@ -133,52 +136,52 @@ class _StatGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 150,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  icon: BoardArt.pa,
-                  value: stats.pa,
-                  tooltip: 'Physical attack',
-                ),
+    // Sizes to whatever width its parent (the side panel) gives it — no
+    // fixed width of its own now that it sits in a narrow column instead of
+    // a wide bottom bar.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _StatTile(
+                icon: BoardArt.pa,
+                value: stats.pa,
+                tooltip: 'Physical attack',
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _StatTile(
-                  icon: BoardArt.ma,
-                  value: stats.ma,
-                  tooltip: 'Magic attack',
-                ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _StatTile(
+                icon: BoardArt.ma,
+                value: stats.ma,
+                tooltip: 'Magic attack',
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  icon: BoardArt.pd,
-                  value: stats.pd,
-                  tooltip: 'Physical defense',
-                ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: _StatTile(
+                icon: BoardArt.pd,
+                value: stats.pd,
+                tooltip: 'Physical defense',
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _StatTile(
-                  icon: BoardArt.md,
-                  value: stats.md,
-                  tooltip: 'Magic defense',
-                ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _StatTile(
+                icon: BoardArt.md,
+                value: stats.md,
+                tooltip: 'Magic defense',
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -238,10 +241,13 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Sized down from the original bottom-bar version (24px icon / 18px
+    // digits) — each tile now only gets about half of the narrow side
+    // panel's width, not a share of a wide bottom bar.
     return Tooltip(
       message: tooltip,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
@@ -254,12 +260,12 @@ class _StatTile extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(icon, width: 24, height: 24),
-            const SizedBox(width: 6),
+            Image.asset(icon, width: 18, height: 18),
+            const SizedBox(width: 4),
             AnimatedNumber(
               value: value,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 15,
                 color: AppColors.textLight,
                 fontWeight: FontWeight.w800,
               ),
