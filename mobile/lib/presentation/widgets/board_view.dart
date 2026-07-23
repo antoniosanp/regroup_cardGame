@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../domain/models/board_point.dart';
 import '../assets/corner_art.dart';
 
-/// Size of one lattice cell, in logical pixels. See mobile_patterns.md
-/// (agent memory) for the 32dp grid-cell convention this mirrors.
-const double boardCellSize = 32;
+/// Size of one lattice cell, in logical pixels. Bumped toward the web's 56px
+/// look; BoardDropTarget shares this same constant for hit-testing, so
+/// changing it keeps placement coordinates correct.
+const double boardCellSize = 40;
 
 class BoardBounds {
   final int minX;

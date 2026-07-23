@@ -24,13 +24,10 @@ class ActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nothing to show until a card has been dropped on the board (the earlier
+    // "Drag your card onto the board" hint was unnecessary clutter).
     if (!hasPendingPlacement) {
-      return const Center(
-        child: Text(
-          'Drag your card onto the board to place it',
-          style: TextStyle(color: Colors.white38, fontSize: 12),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return Row(

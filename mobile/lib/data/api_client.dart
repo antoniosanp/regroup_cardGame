@@ -7,19 +7,65 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/models/identity.dart';
 
 const String _storageKey = 'regroup.identity';
+const String _backendUrlKey = 'regroup.backendUrl';
 
-/// Override at build time with `--dart-define=BACKEND_URL=http://host:port`.
-/// Without an override: 10.0.2.2 is the Android emulator's alias for the
-/// host machine's localhost (plain "localhost" from inside the emulator
-/// resolves to the emulator itself, not the host running the backend) —
-/// iOS simulators and physical devices on the same network need their own
-/// override, since neither of those aliases apply to them.
-const String _backendUrlOverride = String.fromEnvironment('BACKEND_URL');
+/// Compile-time override: `--dart-define=BACKEND_URL=http://host:port`.
+const String _backendUrlBuildOverride = String.fromEnvironment('BACKEND_URL');
 
+/// Runtime override, set in-app (Server address field on the name screen) and
+/// persisted. Cached synchronously so the sync [backendHttpUrl] can use it;
+/// [loadBackendOverride] must run once at startup to populate it.
+String? _runtimeOverride;
+
+/// Loads the persisted in-app backend URL. Call once in main() before connecting.
+Future<void> loadBackendOverride() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString(_backendUrlKey);
+    _runtimeOverride = (v != null && v.trim().isNotEmpty) ? v.trim() : null;
+  } catch (_) {
+    _runtimeOverride = null;
+  }
+}
+
+/// The current in-app override, or null if none (then the default is used).
+String? backendOverride() => _runtimeOverride;
+
+/// Persists (or clears, if null/empty) the in-app backend URL. Takes effect on
+/// the next connection.
+Future<void> setBackendOverride(String? url) async {
+  final trimmed = url?.trim();
+  _runtimeOverride = (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (_runtimeOverride == null) {
+      await prefs.remove(_backendUrlKey);
+    } else {
+      await prefs.setString(_backendUrlKey, _runtimeOverride!);
+    }
+  } catch (_) {}
+}
+
+/// Base HTTP URL of the backend. Precedence: in-app runtime override →
+/// build-time dart-define → platform default. On Android the default is
+/// 10.0.2.2 (the emulator's alias for the host's localhost); real devices
+/// need the in-app override pointed at the backend's reachable address.
 String backendHttpUrl() {
-  if (_backendUrlOverride.isNotEmpty) return _backendUrlOverride;
+  if (_runtimeOverride != null) return _normalize(_runtimeOverride!);
+  if (_backendUrlBuildOverride.isNotEmpty) {
+    return _normalize(_backendUrlBuildOverride);
+  }
   if (!Platform.isAndroid) return 'http://localhost:8080';
   return 'http://10.0.2.2:8080';
+}
+
+/// Tolerates a bare `host:port` (adds http://) and strips a trailing slash, so
+/// the in-app field is forgiving about exact formatting.
+String _normalize(String url) {
+  var u = url.trim();
+  if (!u.startsWith('http://') && !u.startsWith('https://')) u = 'http://$u';
+  if (u.endsWith('/')) u = u.substring(0, u.length - 1);
+  return u;
 }
 
 String backendWsUrl() =>

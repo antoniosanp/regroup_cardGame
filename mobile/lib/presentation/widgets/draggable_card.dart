@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/models/card.dart' as domain;
+import '../../sfx/sfx.dart';
 import 'card_view.dart';
 
 /// The held card, made draggable from anywhere on its surface — no need to
@@ -21,21 +22,24 @@ class DraggableHeldCard extends StatelessWidget {
           'Held card: ${card.topLeft.label}, ${card.topRight.label}, ${card.bottomLeft.label}, ${card.bottomRight.label}. Drag onto the board to place it.',
       child: Draggable<domain.Card>(
         data: card,
-        // Anchors the feedback at the pointer itself (centered under the
-        // finger, then lifted by feedbackOffset) rather than at wherever on
-        // the card you happened to grab it (the default). This matters
-        // beyond looks: BoardDropTarget's hit-testing (FE-03) always uses
-        // the raw pointer position, not the feedback widget's position — with
-        // the default anchor strategy, grabbing the card off-center made the
-        // ghost visually drift away from the point that actually counts for
-        // placement, which is exactly the "doesn't feel natural" complaint.
+        // Feedback centered on the finger. CRITICAL: feedbackOffset stays zero
+        // so the DragTarget hit-test point is exactly the finger — the same
+        // point BoardDropTarget converts into a board position. A non-zero
+        // feedbackOffset shifts the hit-test away from where the placement is
+        // computed, which made drops land off the (small) board and register
+        // as "can't place any card". The card is lifted purely visually with
+        // a Transform below (drawing only, no effect on hit-testing) so the
+        // finger doesn't hide it.
         dragAnchorStrategy: pointerDragAnchorStrategy,
-        feedbackOffset: const Offset(0, -80),
+        onDragStarted: () => playSfx(SfxName.cardDragStart),
         feedback: Material(
           color: Colors.transparent,
-          child: Opacity(
-            opacity: 0.9,
-            child: CardView(card: card, size: size),
+          child: Transform.translate(
+            offset: Offset(0, -size * 0.85),
+            child: Opacity(
+              opacity: 0.9,
+              child: CardView(card: card, size: size),
+            ),
           ),
         ),
         childWhenDragging: Opacity(

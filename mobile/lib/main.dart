@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'data/api_client.dart' as api;
 import 'presentation/app_messenger.dart';
 import 'presentation/screens/app_root.dart';
 import 'presentation/theme/app_colors.dart';
+import 'sfx/sfx.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +17,8 @@ Future<void> main() async {
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
+  await Sfx.instance.init();
+  await api.loadBackendOverride();
   runApp(const ProviderScope(child: RegroupApp()));
 }
 

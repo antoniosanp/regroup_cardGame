@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../domain/models/phase.dart';
+import '../../sfx/sfx.dart';
+import '../assets/board_art.dart';
+import '../theme/app_colors.dart';
 
 const int _turnSeconds = 60;
 
@@ -52,6 +55,12 @@ class _TurnTimerState extends State<TurnTimer>
   @override
   void didUpdateWidget(covariant TurnTimer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Bright chime the moment it becomes your turn (mirrors TurnTimer.tsx).
+    if (widget.isYourTurn &&
+        !oldWidget.isYourTurn &&
+        widget.phase == Phase.turn) {
+      playSfx(SfxName.turnYours);
+    }
     if (oldWidget.round != widget.round ||
         oldWidget.currentSeat != widget.currentSeat ||
         oldWidget.phase != widget.phase) {
@@ -64,9 +73,20 @@ class _TurnTimerState extends State<TurnTimer>
     setState(() => _secondsLeft = _turnSeconds);
     if (widget.phase != Phase.turn) return;
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final before = _secondsLeft;
       setState(() {
         if (_secondsLeft > 0) _secondsLeft--;
       });
+      // Ticks only for your own turn's countdown; the expired toll fires the
+      // single second it crosses 0 (not repeatedly while parked at 0), same
+      // as the web's TurnTimer.
+      if (widget.isYourTurn) {
+        if (_secondsLeft > 0 && _secondsLeft <= 10) {
+          playSfx(SfxName.timerLowTick);
+        } else if (_secondsLeft == 0 && before > 0) {
+          playSfx(SfxName.timerExpired);
+        }
+      }
     });
   }
 
@@ -99,43 +119,68 @@ class _TurnTimerState extends State<TurnTimer>
         ? (_secondsLeft == 0 ? 'Auto-placing…' : 'Your turn!')
         : (widget.currentName ?? 'Waiting…');
 
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final pulse = low ? _pulseController.value : 0.0;
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          decoration: BoxDecoration(
-            color: yours ? Colors.amber.withValues(alpha: 0.2) : Colors.black26,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: low
-                  ? Color.lerp(Colors.redAccent, Colors.red.shade900, pulse)!
-                  : Colors.white24,
-              width: low ? 1 + pulse : 1,
+    // Square plaque backed by panelSquare.png, mirroring the web's
+    // .turn-timer (a --topbox-size square). A low-timer pulse tints the value.
+    return AspectRatio(
+      aspectRatio: 1,
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final pulse = low ? _pulseController.value : 0.0;
+          return Container(
+            decoration: BoxDecoration(
+              image: const DecorationImage(
+                image: AssetImage(BoardArt.panelSquare),
+                fit: BoxFit.fill,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border: low
+                  ? Border.all(
+                      color: Color.lerp(
+                        AppColors.bad,
+                        Colors.red.shade900,
+                        pulse,
+                      )!,
+                      width: 1 + pulse * 2,
+                    )
+                  : null,
             ),
-          ),
-          child: child,
-        );
-      },
-      child: Semantics(
-        label: inTurn ? 'Turn timer: $mm minutes $ss seconds, $label' : label,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              inTurn ? '$mm:${ss.toString().padLeft(2, '0')}' : '--:--',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: low ? Colors.redAccent : Colors.white,
+            child: child,
+          );
+        },
+        child: Semantics(
+          label: inTurn ? 'Turn timer: $mm minutes $ss seconds, $label' : label,
+          // One FittedBox around the whole stack scales it to fit the square
+          // at any size — no per-child overflow.
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    inTurn ? '$mm:${ss.toString().padLeft(2, '0')}' : '--:--',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: low ? AppColors.bad : AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: yours ? FontWeight.w800 : FontWeight.w600,
+                      color: yours ? AppColors.wood : AppColors.text,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ],
+          ),
         ),
       ),
     );

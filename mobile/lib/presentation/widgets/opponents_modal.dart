@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../../domain/models/board_point.dart';
 import '../../domain/models/player.dart';
 import '../../domain/models/stats.dart';
+import '../../sfx/sfx.dart';
 import '../assets/board_art.dart';
 import 'board_view.dart';
 
-/// Opens from the InfoPanel's "Opponent boards" button. Lets you flip
+/// Opens from the top-right opponent-board button. Lets you flip
 /// between every opponent's board plus an icon-based stat row and their
 /// turn/eliminated/offline flags. Mirrors the web client's
 /// OpponentsModal.tsx.
@@ -86,7 +87,10 @@ class _OpponentsDialogState extends State<_OpponentsDialog> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      playSfx(SfxName.uiModalClose);
+                      Navigator.of(context).pop();
+                    },
                     child: const Text('Close'),
                   ),
                 ],
@@ -108,8 +112,10 @@ class _OpponentsDialogState extends State<_OpponentsDialog> {
                     final isSelected = p.playerId == selectedId;
                     return ChoiceChip(
                       selected: isSelected,
-                      onSelected: (_) =>
-                          setState(() => _selectedId = p.playerId),
+                      onSelected: (_) {
+                        playSfx(SfxName.uiClick);
+                        setState(() => _selectedId = p.playerId);
+                      },
                       avatar: CircleAvatar(
                         backgroundImage: AssetImage(avatarFor(p.seat)),
                       ),

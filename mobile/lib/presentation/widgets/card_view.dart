@@ -8,13 +8,14 @@ import '../theme/app_colors.dart';
 
 /// A card rendered as four corner attribute icons in a 2x2 grid. Pure
 /// display — no drag/interaction here (see FE-02/FE-03 for that). Mirrors
-/// the web client's CardView.tsx, including its `.card`/`.corner` styling
-/// (iron background, wood-dark border, rounded corners).
+/// the web client's CardView.tsx `.card`/`.corner` styling (iron background,
+/// wood-dark border, rounded corners).
 ///
-/// [size] may be `double.infinity` to fill the parent's constraints (used by
-/// the market slots, which give it a square via AspectRatio). Internal
-/// proportions are computed from the actually-laid-out size via LayoutBuilder
-/// so both a fixed size and an infinite (fill) size work.
+/// Layout is entirely flex-based (Expanded rows/cells) so it fills whatever
+/// square box it's given and can NEVER overflow — the earlier
+/// LayoutBuilder-with-computed-sizes version produced sub-pixel overflow
+/// stripes on every card. [size] may be `double.infinity` to fill the
+/// parent's constraints (the market slots give it a square via AspectRatio).
 class CardView extends StatelessWidget {
   final domain.Card card;
   final double size;
@@ -24,61 +25,55 @@ class CardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: size.isFinite ? size : null,
-      height: size.isFinite ? size : null,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final side = constraints.biggest.shortestSide;
-          final gap = side * 0.06;
-          final padding = side * 0.05;
-          final cell = (side - gap - padding * 2) / 2;
-          return Container(
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: AppColors.iron,
-              borderRadius: BorderRadius.circular(side * 0.08),
-              border: Border.all(color: AppColors.woodDark, width: 2),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _CornerCell(
+      width: size.isFinite ? size : double.infinity,
+      height: size.isFinite ? size : double.infinity,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.iron,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.woodDark, width: 2),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _CornerCell(
                       attribute: card.topLeft,
                       rotation: card.rotation,
-                      size: cell,
                     ),
-                    SizedBox(width: gap),
-                    _CornerCell(
+                  ),
+                  Expanded(
+                    child: _CornerCell(
                       attribute: card.topRight,
                       rotation: card.rotation,
-                      size: cell,
                     ),
-                  ],
-                ),
-                SizedBox(height: gap),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _CornerCell(
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _CornerCell(
                       attribute: card.bottomLeft,
                       rotation: card.rotation,
-                      size: cell,
                     ),
-                    SizedBox(width: gap),
-                    _CornerCell(
+                  ),
+                  Expanded(
+                    child: _CornerCell(
                       attribute: card.bottomRight,
                       rotation: card.rotation,
-                      size: cell,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -87,27 +82,25 @@ class CardView extends StatelessWidget {
 class _CornerCell extends StatelessWidget {
   final CornerAttribute attribute;
   final Rotation rotation;
-  final double size;
 
-  const _CornerCell({
-    required this.attribute,
-    required this.rotation,
-    required this.size,
-  });
+  const _CornerCell({required this.attribute, required this.rotation});
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: attribute.label,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(size * 0.12),
-        child: Transform.rotate(
-          angle: rotation.degrees * 3.1415926535 / 180,
-          child: Image.asset(
-            iconFor(attribute),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
+    return Padding(
+      padding: const EdgeInsets.all(2),
+      child: Tooltip(
+        message: attribute.label,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: Transform.rotate(
+            angle: rotation.degrees * 3.1415926535 / 180,
+            child: Image.asset(
+              iconFor(attribute),
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
       ),
@@ -125,8 +118,8 @@ class EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: size.isFinite ? size : null,
-      height: size.isFinite ? size : null,
+      width: size.isFinite ? size : double.infinity,
+      height: size.isFinite ? size : double.infinity,
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -134,10 +127,16 @@ class EmptyCard extends StatelessWidget {
           border: Border.all(color: AppColors.woodDark, width: 2),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.muted, fontSize: 11),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+          ),
         ),
       ),
     );

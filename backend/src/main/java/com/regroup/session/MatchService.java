@@ -335,21 +335,28 @@ public class MatchService {
                 return;
             }
             String playerId = match.playerIdAt(seat);
-            Card card;
-            try {
-                card = engine.pickFromDeck(seat);
-            } catch (InvalidMoveException e) {
-                // Deck exhausted right when the timer fired: this seat truly has nothing to
-                // auto-play with. Re-arm the timeout instead of leaving the match with no
-                // scheduled work at all — without this the match stalls forever, since
-                // scheduleTurnTimeout is only ever called from armTurn(), which a skipped
-                // turn never reaches.
-                log.warn("Match {} seat {} turn timed out with no card left to auto-play; retrying", match.matchId(), seat);
-                scheduleTurnTimeout(match);
-                return;
+            // If the player already picked a card this turn but didn't place it
+            // before the timer expired, auto-PLACE that held card — do NOT try
+            // to draw again (pickFromDeck would throw CARD_ALREADY_HELD, which
+            // used to reschedule the timeout forever, so the turn never
+            // advanced). Only draw a free deck card when no card is held yet.
+            if (engine.heldCard() == null) {
+                Card card;
+                try {
+                    card = engine.pickFromDeck(seat);
+                } catch (InvalidMoveException e) {
+                    // Deck exhausted right when the timer fired: this seat truly has nothing to
+                    // auto-play with. Re-arm the timeout instead of leaving the match with no
+                    // scheduled work at all — without this the match stalls forever, since
+                    // scheduleTurnTimeout is only ever called from armTurn(), which a skipped
+                    // turn never reaches.
+                    log.warn("Match {} seat {} turn timed out with no card left to auto-play; retrying", match.matchId(), seat);
+                    scheduleTurnTimeout(match);
+                    return;
+                }
+                broadcast(match, new Messages.CardPicked(playerId, "DECK", cardDto(card),
+                        marketSnapshot(engine), engine.deckRemaining()));
             }
-            broadcast(match, new Messages.CardPicked(playerId, "DECK", cardDto(card),
-                    marketSnapshot(engine), engine.deckRemaining()));
 
             Board board = engine.player(seat).board();
             Point at = board.isEmpty() ? new Point(0, 0) : board.cells().keySet().iterator().next();

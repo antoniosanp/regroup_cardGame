@@ -12,6 +12,7 @@ import '../domain/models/corner_name.dart';
 import '../domain/models/identity.dart';
 import '../domain/models/phase.dart';
 import '../domain/models/player.dart';
+import '../sfx/sfx.dart';
 import 'game_state.dart';
 
 /// How long an optimistic pick/place lock is allowed to stay `true` with no
@@ -44,6 +45,10 @@ class GameNotifier extends StateNotifier<GameState> {
   final GameSocket Function() _socketFactory;
   GameSocket? _socket;
   Timer? _busyFailsafeTimer;
+  // Tags the in-flight action so a subsequent ERROR can tell a rejected
+  // placement (→ card-place-invalid) apart from any other rejection
+  // (→ ui-error). Purely an sfx concern, mirrors onlineStore.ts's lastAction.
+  String? _lastAction;
 
   GameNotifier({GameSocket Function()? socketFactory})
     : _socketFactory = socketFactory ?? StompGameSocket.new,
@@ -106,6 +111,7 @@ class GameNotifier extends StateNotifier<GameState> {
     final s = state;
     if (s.stage != Stage.match || s.phase != Phase.turn) return;
     if (s.currentSeat != s.yourSeat || s.heldBy != null || s.busy) return;
+    _lastAction = 'pick';
     state = s.copyWith(busy: true);
     _socket?.publish('/app/match.${s.matchId}.pick', {'slot': slot.wireName});
     _armBusyFailsafe();
@@ -114,12 +120,14 @@ class GameNotifier extends StateNotifier<GameState> {
   void rotate() {
     final s = state;
     if (s.heldBy != s.identity?.playerId) return;
+    _lastAction = 'rotate';
     _socket?.publish('/app/match.${s.matchId}.rotate', {});
   }
 
   void place(CornerName corner, int x, int y) {
     final s = state;
     if (s.heldBy != s.identity?.playerId || s.busy) return;
+    _lastAction = 'place';
     state = s.copyWith(busy: true);
     _socket?.publish('/app/match.${s.matchId}.place', {
       'corner': corner.wireName,
@@ -164,6 +172,7 @@ class GameNotifier extends StateNotifier<GameState> {
             conn: ConnStatus.connected,
             stage: wasNameStage ? Stage.lobby : s.stage,
           );
+          if (wasNameStage) playSfx(SfxName.uiConnect);
           if (s.matchId != null) {
             _socket?.publish('/app/match.${s.matchId}.resume', {});
           } else if (s.stage == Stage.queue) {
@@ -172,6 +181,7 @@ class GameNotifier extends StateNotifier<GameState> {
         },
         onDisconnect: () {
           if (state.conn == ConnStatus.connected) {
+            playSfx(SfxName.uiReconnecting);
             state = state.copyWith(conn: ConnStatus.reconnecting);
           }
         },
@@ -182,6 +192,7 @@ class GameNotifier extends StateNotifier<GameState> {
         onFatalError: (message) async {
           await api.clearIdentity();
           _socket = null;
+          playSfx(SfxName.uiError);
           state = state.copyWith(
             conn: ConnStatus.failed,
             stage: Stage.name,
@@ -203,6 +214,7 @@ class GameNotifier extends StateNotifier<GameState> {
     if (msg == null) return;
     switch (msg) {
       case MatchFoundMessage():
+        playSfx(SfxName.matchFound);
         _socket?.subscribeMatch(msg.matchId);
         state = state.resetMatch().copyWith(
           stage: Stage.match,
@@ -240,6 +252,10 @@ class GameNotifier extends StateNotifier<GameState> {
           busy: false,
         );
       case ErrorMessage():
+        playSfx(
+          _lastAction == 'place' ? SfxName.cardPlaceInvalid : SfxName.uiError,
+        );
+        _lastAction = null;
         final s = state;
         if (msg.code == 'NOT_IN_MATCH' && s.stage == Stage.match) {
           state = s.resetMatch().copyWith(
@@ -280,6 +296,24 @@ class GameNotifier extends StateNotifier<GameState> {
           busy: false,
         );
       case CardPickedMessage():
+        if (msg.playerId == state.identity?.playerId) {
+          _lastAction = null;
+          if (msg.slot == Slot.deck) {
+            playSfx(SfxName.deckDraw);
+          } else {
+            playSfx(SfxName.cardPick);
+            // A/B/C cost 0/1/2 coins, all free during the final round.
+            final price = state.finalRound
+                ? 0
+                : switch (msg.slot) {
+                    Slot.a => 0,
+                    Slot.b => 1,
+                    Slot.c => 2,
+                    Slot.deck => 0,
+                  };
+            if (price > 0) playSfx(SfxName.coinSpend);
+          }
+        }
         state = state.copyWith(
           heldCard: msg.card,
           heldBy: msg.playerId,
@@ -289,10 +323,15 @@ class GameNotifier extends StateNotifier<GameState> {
         );
       case CardRotatedMessage():
         final s = state;
+        if (msg.playerId == s.identity?.playerId) _lastAction = null;
         if (s.heldCard != null) {
           state = s.copyWith(heldCard: s.heldCard!.rotateOnce(msg.rotation));
         }
       case CardPlacedMessage():
+        if (msg.playerId == state.identity?.playerId) {
+          _lastAction = null;
+          playSfx(SfxName.cardPlace);
+        }
         final points = domain.cardToPoints(msg.card, msg.corner, msg.x, msg.y);
         state = state.copyWith(
           boards: _mergePoints(state.boards, msg.playerId, points),
@@ -301,6 +340,30 @@ class GameNotifier extends StateNotifier<GameState> {
           busy: false,
         );
       case StatsUpdatedMessage():
+        if (msg.playerId == state.identity?.playerId) {
+          final prevMatches = state.players.where(
+            (p) => p.playerId == msg.playerId,
+          );
+          final prev = prevMatches.isEmpty ? null : prevMatches.first.stats;
+          if (prev != null) {
+            // Net a placement's full stat delta into one sound (a placement
+            // that raises one stat while lowering another resolves by the sum).
+            final n = msg.stats;
+            final delta =
+                (n.hp - prev.hp) +
+                (n.pa - prev.pa) +
+                (n.pd - prev.pd) +
+                (n.ma - prev.ma) +
+                (n.md - prev.md) +
+                (n.cn - prev.cn) +
+                (n.hpp - prev.hpp);
+            if (delta > 0) {
+              playSfx(SfxName.statUp);
+            } else if (delta < 0) {
+              playSfx(SfxName.statDown);
+            }
+          }
+        }
         state = state.copyWith(
           players: [
             for (final p in state.players)
@@ -342,6 +405,9 @@ class GameNotifier extends StateNotifier<GameState> {
           ],
         );
       case MatchResultMessage():
+        // The victory/defeat stinger is fired by ResultScreen on mount (like
+        // the web), not here — otherwise it would double, and it would sound
+        // while the last battle overlay is still animating.
         state = state.copyWith(
           phase: Phase.matchOver,
           winners: msg.winners,

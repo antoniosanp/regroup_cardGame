@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/board_point.dart';
 import '../../domain/models/card.dart' as domain;
 import '../../domain/models/corner_name.dart';
+import '../../sfx/sfx.dart';
 import 'board_view.dart';
 
 /// Wraps [BoardView] as a drop target for a dragged [domain.Card] and
@@ -112,6 +113,15 @@ class _BoardDropTargetState extends State<BoardDropTarget> {
 
   void _updateCandidate(Offset globalPosition, domain.Card card) {
     final next = _computeCandidate(globalPosition, card);
+    // Barely-audible tick when the preview lands on a NEW anchor point, same
+    // as the web's card-hover-cell on onDragOverPoint changes.
+    final prev = _candidate;
+    final movedAnchor =
+        next != null &&
+        (prev == null ||
+            prev.anchorX != next.anchorX ||
+            prev.anchorY != next.anchorY);
+    if (movedAnchor) playSfx(SfxName.cardHoverCell);
     setState(() => _candidate = next);
   }
 

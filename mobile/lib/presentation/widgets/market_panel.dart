@@ -3,33 +3,27 @@ import 'package:flutter/material.dart';
 import '../../domain/models/card.dart' as domain;
 import '../../domain/models/market.dart';
 import '../../domain/models/phase.dart';
+import '../../sfx/sfx.dart';
 import '../assets/board_art.dart';
 import '../theme/app_colors.dart';
-import 'card_detail.dart';
 import 'card_view.dart';
 
 const Map<Slot, int> _slotPrice = {Slot.a: 0, Slot.b: 1, Slot.c: 2};
 
-/// Left-side panel: while no card is held, a 2-column grid of the three
-/// market slots (A/B/C) plus the free face-down deck draw; once a card is
-/// picked, the same space switches to [CardDetail] (mirrors the web
-/// client's Market.tsx + the "held card" display it used to render
-/// elsewhere — moving it into this panel's space is the actual UX
-/// improvement this HU makes for the landscape mobile layout). Once the
-/// card has been dropped on the board and is awaiting Confirm/Cancel
-/// (FE-07), this panel shows neither — the card visually "moved" to the
-/// board's pending preview, so dragging it again from here would be
-/// confusing.
+/// Horizontal market frame (`marketFrame.png`, aspect 1063/288) with four
+/// slots placed over the painted card windows — a faithful port of the web's
+/// `.market`/`.market-slots`. The window/gap fractions come straight from the
+/// web CSS grid (`210fr 30fr 213fr 36fr 216fr 33fr 207fr` inside padded
+/// insets measured on the 1063×288 art). Slots are tap-to-pick with a small
+/// cost badge, since stacking a Pick button under each card doesn't fit this
+/// short, wide frame on a phone.
 class MarketPanel extends StatelessWidget {
   final Market market;
   final int deckRemaining;
   final bool canPick;
   final int yourCoins;
   final bool finalRound;
-  final domain.Card? heldCard;
-  final bool placementPending;
   final ValueChanged<Slot> onPick;
-  final VoidCallback onRotate;
 
   const MarketPanel({
     super.key,
@@ -38,118 +32,89 @@ class MarketPanel extends StatelessWidget {
     this.canPick = false,
     this.yourCoins = 0,
     this.finalRound = false,
-    this.heldCard,
-    this.placementPending = false,
     this.onPick = _noOpPick,
-    this.onRotate = _noOp,
   });
 
   static void _noOpPick(Slot slot) {}
-  static void _noOp() {}
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.parchmentDark,
-        border: Border(right: BorderSide(color: AppColors.woodDark, width: 2)),
-      ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        transitionBuilder: (child, animation) =>
-            FadeTransition(opacity: animation, child: child),
-        // While a placement is pending, the card is shown on the board as a
-        // preview and the Confirm/Cancel buttons sit in the bottom bar — so
-        // this panel just stays empty (no big redundant "card placed" notice).
-        child: placementPending
-            ? const SizedBox.expand(key: ValueKey('pending'))
-            : heldCard != null
-            ? CardDetail(
-                key: const ValueKey('detail'),
-                card: heldCard!,
-                onRotate: onRotate,
-              )
-            : _MarketGrid(
-                key: const ValueKey('grid'),
-                market: market,
-                deckRemaining: deckRemaining,
-                canPick: canPick,
-                yourCoins: yourCoins,
-                finalRound: finalRound,
-                onPick: onPick,
-              ),
-      ),
-    );
-  }
-}
-
-class _MarketGrid extends StatelessWidget {
-  final Market market;
-  final int deckRemaining;
-  final bool canPick;
-  final int yourCoins;
-  final bool finalRound;
-  final ValueChanged<Slot> onPick;
-
-  const _MarketGrid({
-    super.key,
-    required this.market,
-    required this.deckRemaining,
-    required this.canPick,
-    required this.yourCoins,
-    required this.finalRound,
-    required this.onPick,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Single column of 4 compact rows (A/B/C + deck) instead of a 2x2 grid —
-    // the 2x2 wasted space in this narrow vertical panel. Each row splits
-    // its 1/4 of the panel height between a card thumbnail and its pick
-    // button, so it always fits without overflow no matter how tall the
-    // panel is (Expanded rows).
-    return Padding(
-      padding: const EdgeInsets.all(6),
-      child: Column(
-        children: [
-          Expanded(
-            child: _MarketSlot(
-              card: market.a,
-              price: finalRound ? 0 : _slotPrice[Slot.a]!,
-              canPick: canPick,
-              yourCoins: yourCoins,
-              onPick: () => onPick(Slot.a),
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 1063 / 288,
+        child: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(BoardArt.marketFrame),
+              fit: BoxFit.fill,
             ),
           ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: _MarketSlot(
-              card: market.b,
-              price: finalRound ? 0 : _slotPrice[Slot.b]!,
-              canPick: canPick,
-              yourCoins: yourCoins,
-              onPick: () => onPick(Slot.b),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final h = constraints.maxHeight;
+              // Outer painted border of the frame (fractions of the art).
+              final padLeft = w * (63 / 1063);
+              final padRight = w * (55 / 1063);
+              final padTop = h * (62 / 288);
+              final padBottom = h * (40 / 288);
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  padLeft,
+                  padTop,
+                  padRight,
+                  padBottom,
+                ),
+                child: Row(
+                  children: [
+                    // Window/gap track weights, matching the web CSS grid.
+                    Expanded(
+                      flex: 210,
+                      child: _MarketSlot(
+                        card: market.a,
+                        price: finalRound ? 0 : _slotPrice[Slot.a]!,
+                        canPick: canPick,
+                        yourCoins: yourCoins,
+                        onPick: () => onPick(Slot.a),
+                      ),
+                    ),
+                    const Spacer(flex: 30),
+                    Expanded(
+                      flex: 213,
+                      child: _MarketSlot(
+                        card: market.b,
+                        price: finalRound ? 0 : _slotPrice[Slot.b]!,
+                        canPick: canPick,
+                        yourCoins: yourCoins,
+                        onPick: () => onPick(Slot.b),
+                      ),
+                    ),
+                    const Spacer(flex: 36),
+                    Expanded(
+                      flex: 216,
+                      child: _MarketSlot(
+                        card: market.c,
+                        price: finalRound ? 0 : _slotPrice[Slot.c]!,
+                        canPick: canPick,
+                        yourCoins: yourCoins,
+                        onPick: () => onPick(Slot.c),
+                      ),
+                    ),
+                    const Spacer(flex: 33),
+                    Expanded(
+                      flex: 207,
+                      child: _DeckSlot(
+                        deckRemaining: deckRemaining,
+                        canPick: canPick,
+                        onPick: () => onPick(Slot.deck),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: _MarketSlot(
-              card: market.c,
-              price: finalRound ? 0 : _slotPrice[Slot.c]!,
-              canPick: canPick,
-              yourCoins: yourCoins,
-              onPick: () => onPick(Slot.c),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: _DeckSlot(
-              deckRemaining: deckRemaining,
-              canPick: canPick,
-              onPick: () => onPick(Slot.deck),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -174,39 +139,31 @@ class _MarketSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final affordable = yourCoins >= price;
     final enabled = canPick && card != null && affordable;
-    final blockedByCoins = canPick && card != null && !affordable;
-    final priceText = price == 0
-        ? 'Free'
-        : '$price coin${price > 1 ? 's' : ''}';
-    final label = !affordable && card != null
-        ? 'Not enough coins'
-        : 'Pick · $priceText';
+    final priceText = price == 0 ? 'Free' : '$price';
 
-    // Horizontal: card thumbnail on the left, pick button filling the rest.
-    return Row(
-      children: [
-        AspectRatio(
-          aspectRatio: 1,
-          child: card != null
-              ? CardView(card: card!, size: double.infinity)
-              : const EmptyCard(label: 'empty', size: double.infinity),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: FilledButton(
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              backgroundColor: blockedByCoins ? Colors.red.shade900 : null,
-            ),
-            onPressed: enabled ? onPick : null,
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 11),
-              textAlign: TextAlign.center,
-            ),
+    // Card on top, price floating BELOW it (feedback) so the badge never
+    // covers a card corner.
+    return _TapSlot(
+      enabled: enabled,
+      onTap: onPick,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: card != null
+                ? CardView(card: card!, size: double.infinity)
+                : const EmptyCard(label: '—', size: double.infinity),
           ),
-        ),
-      ],
+          if (card != null) ...[
+            const SizedBox(height: 2),
+            _CostBadge(
+              text: priceText,
+              blocked: canPick && !affordable,
+              free: price == 0,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -225,32 +182,109 @@ class _DeckSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = canPick && deckRemaining > 0;
-    return Row(
-      children: [
-        AspectRatio(
-          aspectRatio: 1,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.asset(BoardArt.cardBack, fit: BoxFit.contain),
-              Text(
-                '$deckRemaining',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: FilledButton(
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+    return _TapSlot(
+      enabled: enabled,
+      onTap: onPick,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.asset(BoardArt.cardBack, fit: BoxFit.contain),
+                Text(
+                  '$deckRemaining',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: AppColors.textLight,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+                  ),
+                ),
+              ],
             ),
-            onPressed: enabled ? onPick : null,
-            child: const Text('Draw · Free', style: TextStyle(fontSize: 11)),
           ),
+          const SizedBox(height: 2),
+          const _CostBadge(text: 'Free', blocked: false, free: true),
+        ],
+      ),
+    );
+  }
+}
+
+/// A tappable market window: dims when not pickable, and shows an ink ripple.
+class _TapSlot extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _TapSlot({
+    required this.enabled,
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.75,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          // A disabled slot still responds with the "locked drawer" denied
+          // sound, mirroring the web Market's pick-denied on disabled clicks.
+          onTap: enabled ? onTap : () => playSfx(SfxName.pickDenied),
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(padding: const EdgeInsets.all(2), child: child),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _CostBadge extends StatelessWidget {
+  final String text;
+  final bool blocked;
+  final bool free;
+
+  const _CostBadge({
+    required this.text,
+    required this.blocked,
+    required this.free,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = blocked
+        ? AppColors.bad
+        : free
+        ? AppColors.good
+        : AppColors.wood;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.gold, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!free) ...[
+            Image.asset(BoardArt.coin, width: 11, height: 11),
+            const SizedBox(width: 2),
+          ],
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textLight,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
